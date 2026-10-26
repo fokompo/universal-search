@@ -422,10 +422,11 @@ Sites:
 HELP
 }
 
-if [[ "${0##*/}" == S && $# -eq 0 ]]; then
+if [[ $# -eq 0 && ( "${0##*/}" == "s" || "${0##*/}" == "S" || "${0##*/}" == "search" || "${0##*/}" == "Search" ) ]]; then
     interactive_search
     exit $?
 fi
+
 
 if (($# == 0)); then show_help; exit 0; fi
 

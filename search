@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+
+if [[ "$#" -eq 0 || "$1" == "--help" ]]; then
+    cat <<'HELP'
+Universal Search
+
+Usage: s [site] search terms
+
+Sites:
+  g, google       Google (default)
+  yt, youtube     YouTube
+  wiki            Wikipedia
+  gh, github      GitHub
+  reddit          Reddit
+  ddg             DuckDuckGo
+  mdn             MDN Web Docs
+  arch            Arch Linux Wiki
+  maps            Google Maps
+  images          Google Images
+  bing            Bing
+  brave           Brave Search
+  npm             npm packages
+  pypi            Python packages
+  rust            Rust documentation
+  wikiarch        Arch Wiki
+  yt              YouTube
+
+Examples:
+  s portal 2
+  s yt portal 2
+  s wiki Factorio
+  s gh hyprland
+  s reddit linux
+  s arch pacman
+  s images cats
+HELP
+    exit 0
+fi
+
+site="${1,,}"
+shift
+query="$*"
+
+if [[ -z "$query" ]]; then
+    query="$site"
+    site="google"
+fi
+
+case "$site" in
+    g|google)    url="https://www.google.com/search?q=" ;;
+    yt|youtube)  url="https://www.youtube.com/results?search_query=" ;;
+    wiki)        url="https://en.wikipedia.org/w/index.php?search=" ;;
+    gh|github)   url="https://github.com/search?q=" ;;
+    reddit)      url="https://www.reddit.com/search/?q=" ;;
+    ddg)         url="https://duckduckgo.com/?q=" ;;
+    mdn)         url="https://developer.mozilla.org/en-US/search?q=" ;;
+    arch|wikiarch) url="https://wiki.archlinux.org/index.php?search=" ;;
+    maps)        url="https://www.google.com/maps/search/" ;;
+    images)      url="https://www.google.com/search?tbm=isch&q=" ;;
+    bing)        url="https://www.bing.com/search?q=" ;;
+    brave)       url="https://search.brave.com/search?q=" ;;
+    npm)         url="https://www.npmjs.com/search?q=" ;;
+    pypi)        url="https://pypi.org/search/?q=" ;;
+    rust)        url="https://doc.rust-lang.org/std/?search=" ;;
+    *)
+        query="$site $query"
+        url="https://www.google.com/search?q="
+        ;;
+esac
+
+encoded="$(python -c 'import sys, urllib.parse; print(urllib.parse.quote_plus(sys.argv[1]))' "$query")"
+xdg-open "${url}${encoded}" >/dev/null 2>&1 &

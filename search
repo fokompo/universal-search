@@ -1,72 +1,470 @@
 #!/usr/bin/env bash
+set -u
 
-if [[ "$#" -eq 0 || "$1" == "--help" ]]; then
+sites=(google youtube wiki github reddit ddg mdn arch maps images bing brave npm pypi rust)
+labels=("Google" "YouTube" "Wikipedia" "GitHub" "Reddit" "DuckDuckGo" "MDN Web Docs" "Arch Wiki" "Google Maps" "Google Images" "Bing" "Brave Search" "npm" "PyPI" "Rust Docs")
+aliases=(g yt wiki gh reddit ddg mdn arch maps images bing brave npm pypi rust)
+
+R=$'\033[0m'
+B=$'\033[1m'
+M=$'\033[38;2;105;220;205m'
+V=$'\033[38;2;177;156;255m'
+Y=$'\033[38;2;245;196;112m'
+D=$'\033[38;2;130;145;165m'
+W=$'\033[38;2;230;237;247m'
+SEL=$'\033[48;2;42;72;91;38;2;255;255;255m'
+
+DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/universal-search"
+HISTORY_FILE="$DATA_DIR/history"
+
+filter=""
+selected=0
+private=0
+mode=menu
+query=""
+history=()
+matches=()
+picked=()
+
+cleanup() {
+    printf '\033[0m\033[?25h'
+    stty echo 2>/dev/null || true
+}
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+url_for() {
+    case "${1,,}" in
+        g|google)   printf '%s' 'https://www.google.com/search?q=' ;;
+        yt|youtube) printf '%s' 'https://www.youtube.com/results?search_query=' ;;
+        wiki)       printf '%s' 'https://en.wikipedia.org/w/index.php?search=' ;;
+        gh|github)  printf '%s' 'https://github.com/search?q=' ;;
+        reddit)     printf '%s' 'https://www.reddit.com/search/?q=' ;;
+        ddg)        printf '%s' 'https://duckduckgo.com/?q=' ;;
+        mdn)        printf '%s' 'https://developer.mozilla.org/en-US/search?q=' ;;
+        arch)       printf '%s' 'https://wiki.archlinux.org/index.php?search=' ;;
+        maps)       printf '%s' 'https://www.google.com/maps/search/?api=1&query=' ;;
+        images)     printf '%s' 'https://www.google.com/search?tbm=isch&q=' ;;
+        bing)       printf '%s' 'https://www.bing.com/search?q=' ;;
+        brave)      printf '%s' 'https://search.brave.com/search?q=' ;;
+        npm)        printf '%s' 'https://www.npmjs.com/search?q=' ;;
+        pypi)       printf '%s' 'https://pypi.org/search/?q=' ;;
+        rust)       printf '%s' 'https://doc.rust-lang.org/std/?search=' ;;
+        *) return 1 ;;
+    esac
+}
+
+urlencode() {
+    local LC_ALL=C input="$1" out="" c hex i
+    for ((i=0; i<${#input}; i++)); do
+        c="${input:i:1}"
+        case "$c" in
+            [a-zA-Z0-9.~_-]) out+="$c" ;;
+            *) printf -v hex '%%%02X' "'$c"; out+="$hex" ;;
+        esac
+    done
+    printf '%s' "$out"
+}
+
+is_url() {
+    [[ "$1" =~ ^https?://[^[:space:]]+$ ]]
+}
+
+find_browser() {
+    local desktop=""
+    desktop="$(xdg-settings get default-web-browser 2>/dev/null || true)"
+    [[ -n "$desktop" ]] ||
+        desktop="$(xdg-mime query default x-scheme-handler/https 2>/dev/null || true)"
+    desktop="${desktop,,}"
+
+    case "$desktop" in
+        *firefox*) command -v firefox || command -v firefox-esr || true ;;
+        *brave*) command -v brave-browser || command -v brave || true ;;
+        *chromium*) command -v chromium || command -v chromium-browser || true ;;
+        *google-chrome*) command -v google-chrome-stable || command -v google-chrome || true ;;
+        *vivaldi*) command -v vivaldi-stable || command -v vivaldi || true ;;
+        *edge*) command -v microsoft-edge-stable || command -v microsoft-edge || true ;;
+        *)
+            command -v firefox ||
+            command -v chromium ||
+            command -v brave-browser ||
+            command -v google-chrome-stable ||
+            command -v vivaldi ||
+            true
+            ;;
+    esac
+}
+
+open_target() {
+    local target="$1" use_private="${2:-0}" browser flag
+    if (( ! use_private )); then
+        xdg-open "$target" >/dev/null 2>&1 &
+        return 0
+    fi
+
+    browser="$(find_browser)"
+    if [[ -z "$browser" ]]; then
+        printf 'Private mode: supported browser not found.\n' >&2
+        return 1
+    fi
+
+    case "${browser##*/}" in
+        firefox|firefox-esr) flag="--private-window" ;;
+        brave|brave-browser|chromium|chromium-browser|google-chrome|google-chrome-stable|vivaldi|vivaldi-stable)
+            flag="--incognito" ;;
+        microsoft-edge|microsoft-edge-stable) flag="--inprivate" ;;
+        *)
+            printf 'Private mode is not configured for %s\n' "$browser" >&2
+            return 1
+            ;;
+    esac
+
+    "$browser" "$flag" "$target" >/dev/null 2>&1 &
+}
+
+remember_query() {
+    local q="$1" old
+    (( private )) && return 0
+    [[ -n "$q" ]] || return 0
+
+    mkdir -p "$DATA_DIR" || return 0
+    local -a updated=()
+
+    if [[ -f "$HISTORY_FILE" ]]; then
+        while IFS= read -r old; do
+            [[ "$old" == "$q" ]] || updated+=("$old")
+        done < "$HISTORY_FILE"
+    fi
+
+    updated+=("$q")
+    if ((${#updated[@]} > 20)); then
+        updated=("${updated[@]: -20}")
+    fi
+
+    printf '%s\n' "${updated[@]}" > "$HISTORY_FILE"
+    history=("${updated[@]}")
+}
+
+load_history() {
+    history=()
+    [[ -f "$HISTORY_FILE" ]] && mapfile -t history < "$HISTORY_FILE"
+}
+
+build_matches() {
+    local i needle="${filter,,}"
+    matches=()
+
+    for ((i=0; i<${#sites[@]}; i++)); do
+        if [[ -z "$needle" ||
+              "${labels[i],,}" == *"$needle"* ||
+              "${aliases[i],,}" == *"$needle"* ||
+              "${sites[i],,}" == *"$needle"* ]]; then
+            matches+=("$i")
+        fi
+    done
+
+    if ((${#matches[@]} == 0)); then
+        selected=0
+    elif ((selected >= ${#matches[@]})); then
+        selected=$((${#matches[@]} - 1))
+    fi
+}
+
+draw_menu() {
+    local i idx mark chosen=0
+    build_matches
+
+    for ((i=0; i<${#picked[@]}; i++)); do
+        [[ "${picked[i]:-0}" == 1 ]] && chosen=$((chosen + 1))
+    done
+
+    printf '\033[H\033[2J'
+    printf '%s╭──────────────────────────────────────────────────────────────────────────────╮%s\n' "$M" "$R"
+    printf '%s│%s  %s◈ UNIVERSAL SEARCH%s                                        %sDISCOVER%s       %s│%s\n' "$M" "$R" "$B$M" "$R" "$V" "$R" "$M" "$R"
+    printf '%s├──────────────────────────────────────────────────────────────────────────────┤%s\n' "$M" "$R"
+    printf '%s│%s  FILTER   %-66.66s%s│%s\n' "$M" "$R" "${filter:-Type to filter services...}" "$M" "$R"
+
+    if ((private)); then
+        printf '%s│%s  MODE     %s● PRIVATE / INCOGNITO%s                                           %s│%s\n' "$M" "$R" "$Y" "$R" "$M" "$R"
+    else
+        printf '%s│%s  MODE     %s● NORMAL WINDOW%s                                               %s│%s\n' "$M" "$R" "$M" "$R" "$M" "$R"
+    fi
+
+    printf '%s├──────────────────────────────────────────────────────────────────────────────┤%s\n' "$M" "$R"
+    printf '%s│%s  %sSEARCH ENGINES%s                                      %sSESSION%s             %s│%s\n' "$M" "$R" "$B" "$R" "$V" "$R" "$M" "$R"
+    printf '%s├───────────────────────────────────┬──────────────────────────────────────┤%s\n' "$M" "$R"
+
+    for ((i=0; i<10; i++)); do
+        printf '%s│%s' "$M" "$R"
+
+        if ((i < ${#matches[@]})); then
+            idx="${matches[i]}"
+            mark=' '
+            [[ "${picked[idx]:-0}" == 1 ]] && mark='✓'
+
+            if ((i == selected)); then
+                printf '%s %-31.31s %s' "$SEL" "❯ $mark ${labels[idx]} [${aliases[idx]}]" "$R"
+            else
+                printf '  %-32.32s' "$mark ${labels[idx]} [${aliases[idx]}]"
+            fi
+        else
+            printf ' %-33s' ''
+        fi
+
+        printf '%s│%s' "$D" "$R"
+
+        case "$i" in
+            0) printf '  Selected: %-27s' "$chosen services" ;;
+            1) printf '  Visible:  %-27s' "${#matches[@]} services" ;;
+            2) if ((private)); then printf '  Privacy:  %-27s' "Private mode"; else printf '  Privacy:  %-27s' "Normal mode"; fi ;;
+            3) printf '  History:  %-27s' "Last 20 queries saved" ;;
+            4) printf '  Browser:  %-27s' "System default" ;;
+            5) printf '  Tip:      %-27s' "Type to filter instantly" ;;
+            6) printf '  Tip:      %-27s' "Space selects multiple" ;;
+            7) printf '  Tip:      %-27s' "Enter starts a search" ;;
+            8) printf '  Tip:      %-27s' "P toggles private mode" ;;
+            9) printf '  Version:  %-27s' "Universal Search 1.1" ;;
+        esac
+
+        printf '%s│%s\n' "$D" "$R"
+    done
+
+    printf '%s├───────────────────────────────────┴──────────────────────────────────────┤%s\n' "$M" "$R"
+    printf '%s│%s  %s↑/↓%s Navigate  %sSpace%s Select  %sEnter%s Search  %sP%s Private  %sQ%s Quit  %s│%s\n' \
+        "$M" "$R" "$M" "$R" "$M" "$R" "$M" "$R" "$M" "$R" "$M" "$R"
+    printf '%s╰──────────────────────────────────────────────────────────────────────────────╯%s\n' "$M" "$R"
+    printf '%s  CREATOR  %s fokompo  ·  fokompo456  ·  fokompo457%s\n' "$D" "$V" "$R"
+}
+
+draw_query() {
+    local i count=0
+    printf '\033[H\033[2J'
+    printf '%s╭──────────────────────────────────────────────────────────────────────────────╮%s\n' "$M" "$R"
+    printf '%s│%s  %s◈ UNIVERSAL SEARCH%s  /  %sQUERY%s                                           %s│%s\n' "$M" "$R" "$B$M" "$R" "$V" "$R" "$M" "$R"
+    printf '%s├──────────────────────────────────────────────────────────────────────────────┤%s\n' "$M" "$R"
+
+    if ((private)); then
+        printf '%s│%s  MODE  %s● PRIVATE / INCOGNITO%s                                             %s│%s\n' "$M" "$R" "$Y" "$R" "$M" "$R"
+    else
+        printf '%s│%s  MODE  %s● NORMAL WINDOW%s                                                   %s│%s\n' "$M" "$R" "$M" "$R" "$M" "$R"
+    fi
+
+    printf '%s├──────────────────────────────────────────────────────────────────────────────┤%s\n' "$M" "$R"
+    printf '%s│%s  %sTARGETS%s                                                                     %s│%s\n' "$M" "$R" "$B" "$R" "$M" "$R"
+
+    for ((i=0; i<${#sites[@]}; i++)); do
+        if [[ "${picked[i]:-0}" == 1 ]]; then
+            printf '%s│%s  %s✓ %s%s\n' "$M" "$R" "$M" "${labels[i]}" "$R"
+            count=$((count + 1))
+        fi
+    done
+
+    if ((count == 0)); then
+        if ((${#matches[@]})); then
+            printf '%s│%s  %s%s%s\n' "$M" "$R" "$M" "${labels[${matches[selected]}]}" "$R"
+        else
+            printf '%s│%s  Google (default)\n' "$M" "$R"
+        fi
+    fi
+
+    printf '%s├──────────────────────────────────────────────────────────────────────────────┤%s\n' "$M" "$R"
+    printf '%s│%s  %sQUERY%s                                                                     %s│%s\n' "$M" "$R" "$V" "$R" "$M" "$R"
+    printf '%s│%s  %s%s%s\n' "$M" "$R" "$W" "$query" "$R"
+    printf '%s├──────────────────────────────────────────────────────────────────────────────┤%s\n' "$M" "$R"
+    printf '%s│%s  %sEnter%s Launch  %s↑/↓%s History  %sEsc%s Back                                    %s│%s\n' \
+        "$M" "$R" "$M" "$R" "$M" "$R" "$M" "$R" "$M" "$R"
+    printf '%s╰──────────────────────────────────────────────────────────────────────────────╯%s\n' "$M" "$R"
+}
+
+read_key() {
+    IFS= read -rsn1 REPLY || return 1
+
+    if [[ "$REPLY" == $'\x1b' ]]; then
+        local seq=""
+        IFS= read -rsn2 -t 0.15 seq || true
+        case "$seq" in
+            '[A'|'OA') REPLY=UP ;;
+            '[B'|'OB') REPLY=DOWN ;;
+            *) REPLY=ESC ;;
+        esac
+    fi
+}
+
+launch_query() {
+    local q="$1" idx target rc=0
+    [[ -n "$q" ]] || return 0
+    remember_query "$q"
+
+    if is_url "$q"; then
+        open_target "$q" "$private"
+        return $?
+    fi
+
+    local -a targets=()
+    for ((idx=0; idx<${#sites[@]}; idx++)); do
+        [[ "${picked[idx]:-0}" == 1 ]] && targets+=("$idx")
+    done
+
+    if ((${#targets[@]} == 0)); then
+        if ((${#matches[@]})); then
+            targets=("${matches[selected]}")
+        else
+            targets=(0)
+        fi
+    fi
+
+    for idx in "${targets[@]}"; do
+        target="$(url_for "${sites[idx]}")$(urlencode "$q")"
+        open_target "$target" "$private" || rc=$?
+    done
+    return "$rc"
+}
+
+interactive_search() {
+    local key idx history_pos history_draft=""
+    picked=()
+    for ((idx=0; idx<${#sites[@]}; idx++)); do picked[idx]=0; done
+
+    load_history
+    stty -echo 2>/dev/null || true
+    printf '\033[?25l'
+
+    while true; do
+        if [[ "$mode" == menu ]]; then draw_menu; else draw_query; fi
+        read_key || return 0
+        key="$REPLY"
+
+        if [[ "$mode" == menu ]]; then
+            case "$key" in
+                UP)
+                    build_matches
+                    if ((${#matches[@]})); then
+                        selected=$(((selected - 1 + ${#matches[@]}) % ${#matches[@]}))
+                    fi
+                    ;;
+                DOWN)
+                    build_matches
+                    if ((${#matches[@]})); then
+                        selected=$(((selected + 1) % ${#matches[@]}))
+                    fi
+                    ;;
+                ESC) filter=""; selected=0 ;;
+                $'\x7f'|$'\x08') filter="${filter%?}"; selected=0 ;;
+                '')
+                    mode=query
+                    query=""
+                    history_pos=${#history[@]}
+                    history_draft=""
+                    ;;
+                ' ')
+                    build_matches
+                    if ((${#matches[@]})); then
+                        idx="${matches[selected]}"
+                        if [[ "${picked[idx]}" == 1 ]]; then picked[idx]=0; else picked[idx]=1; fi
+                    fi
+                    ;;
+                p|P) ((private = 1 - private)) ;;
+                q|Q) return 0 ;;
+                *)
+                    if [[ ${#key} -eq 1 ]]; then filter+="$key"; selected=0; fi
+                    ;;
+            esac
+        else
+            case "$key" in
+                ESC) mode=menu ;;
+                UP)
+                    if ((${#history[@]})); then
+                        if ((history_pos == ${#history[@]})); then history_draft="$query"; fi
+                        ((history_pos > 0)) && history_pos=$((history_pos - 1))
+                        query="${history[history_pos]}"
+                    fi
+                    ;;
+                DOWN)
+                    if ((history_pos < ${#history[@]})); then
+                        history_pos=$((history_pos + 1))
+                        if ((history_pos == ${#history[@]})); then
+                            query="$history_draft"
+                        else
+                            query="${history[history_pos]}"
+                        fi
+                    fi
+                    ;;
+                $'\x7f'|$'\x08') query="${query%?}" ;;
+                '')
+                    if [[ -n "$query" ]]; then
+                        launch_query "$query"
+                        return $?
+                    fi
+                    ;;
+                *) [[ ${#key} -eq 1 ]] && query+="$key" ;;
+            esac
+        fi
+    done
+}
+
+show_help() {
     cat <<'HELP'
 Universal Search
+Usage:
+  s [site] search terms
+  s -p [site] search terms
+  s https://example.com
+  S                         Interactive menu
 
-Usage: s [site] search terms
+Options:
+  -p, --private             Private/incognito mode
+  -h, --help                Show help
 
 Sites:
-  g, google       Google (default)
-  yt, youtube     YouTube
-  wiki            Wikipedia
-  gh, github      GitHub
-  reddit          Reddit
-  ddg             DuckDuckGo
-  mdn             MDN Web Docs
-  arch            Arch Linux Wiki
-  maps            Google Maps
-  images          Google Images
-  bing            Bing
-  brave           Brave Search
-  npm             npm packages
-  pypi            Python packages
-  rust            Rust documentation
-  wikiarch        Arch Wiki
-  yt              YouTube
-
-Examples:
-  s portal 2
-  s yt portal 2
-  s wiki Factorio
-  s gh hyprland
-  s reddit linux
-  s arch pacman
-  s images cats
+  google, yt, wiki, gh, reddit, ddg, mdn, arch, maps,
+  images, bing, brave, npm, pypi, rust
 HELP
-    exit 0
+}
+
+if [[ "${0##*/}" == S && $# -eq 0 ]]; then
+    interactive_search
+    exit $?
 fi
 
-site="${1,,}"
-shift
-query="$*"
+if (($# == 0)); then show_help; exit 0; fi
 
-if [[ -z "$query" ]]; then
-    query="$site"
-    site="google"
+private=0
+args=()
+while (($#)); do
+    case "$1" in
+        -p|--private) private=1 ;;
+        -h|--help) show_help; exit 0 ;;
+        --) shift; args+=("$@"); break ;;
+        *) args+=("$1") ;;
+    esac
+    shift
+done
+
+if ((${#args[@]} == 0)); then show_help; exit 2; fi
+
+if is_url "${args[0]}"; then
+    open_target "${args[0]}" "$private"
+    exit $?
 fi
 
-case "$site" in
-    g|google)    url="https://www.google.com/search?q=" ;;
-    yt|youtube)  url="https://www.youtube.com/results?search_query=" ;;
-    wiki)        url="https://en.wikipedia.org/w/index.php?search=" ;;
-    gh|github)   url="https://github.com/search?q=" ;;
-    reddit)      url="https://www.reddit.com/search/?q=" ;;
-    ddg)         url="https://duckduckgo.com/?q=" ;;
-    mdn)         url="https://developer.mozilla.org/en-US/search?q=" ;;
-    arch|wikiarch) url="https://wiki.archlinux.org/index.php?search=" ;;
-    maps)        url="https://www.google.com/maps/search/" ;;
-    images)      url="https://www.google.com/search?tbm=isch&q=" ;;
-    bing)        url="https://www.bing.com/search?q=" ;;
-    brave)       url="https://search.brave.com/search?q=" ;;
-    npm)         url="https://www.npmjs.com/search?q=" ;;
-    pypi)        url="https://pypi.org/search/?q=" ;;
-    rust)        url="https://doc.rust-lang.org/std/?search=" ;;
-    *)
-        query="$site $query"
-        url="https://www.google.com/search?q="
-        ;;
-esac
+site="${args[0],,}"
+if ((${#args[@]} == 1)); then
+    if [[ "$site" == *.* && "$site" != *" "* ]]; then
+        open_target "https://$site" "$private"
+    else
+        open_target "$(url_for google)$(urlencode "${args[0]}")" "$private"
+    fi
+    exit $?
+fi
 
-encoded="$(python -c 'import sys, urllib.parse; print(urllib.parse.quote_plus(sys.argv[1]))' "$query")"
-xdg-open "${url}${encoded}" >/dev/null 2>&1 &
+if url_for "$site" >/dev/null 2>&1; then
+    query="${args[*]:1}"
+else
+    site=google
+    query="${args[*]}"
+fi
+
+target="$(url_for "$site")$(urlencode "$query")"
+remember_query "$query"
+open_target "$target" "$private"

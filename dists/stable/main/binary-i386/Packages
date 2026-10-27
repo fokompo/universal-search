@@ -1,0 +1,17 @@
+Package: universal-search
+Version: 1.0.0-1
+Architecture: all
+Maintainer: fokompo <fokompo456@gmail.com>
+Installed-Size: 34
+Depends: bash, xdg-utils
+Filename: public/pool/main/u/universal-search/universal-search_1.0.0-1_all.deb
+Size: 6012
+MD5sum: 780efccf94052ae0d4bce334c33edeb0
+SHA1: f929e123b8e59e469ceb56112297b6da007bab11
+SHA256: 7abab0056ca90b93d80730675c683a5ee7200e73324b44fe0d4a6363c3b9153c
+Section: utils
+Priority: optional
+Description: Universal terminal search
+ Search Google, YouTube, GitHub, Wikipedia and more
+ from a colorful interactive terminal interface or CLI.
+

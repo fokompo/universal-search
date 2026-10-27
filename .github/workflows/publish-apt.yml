@@ -1,0 +1,125 @@
+name: Build and publish APT repository
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apt-repository
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Build Debian package
+        run: |
+          set -e
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential debhelper dpkg-dev apt-utils gnupg
+          dpkg-buildpackage -us -uc -b
+          mkdir -p "$RUNNER_TEMP/debs"
+          cp ../universal-search_*_all.deb "$RUNNER_TEMP/debs/"
+
+      - name: Import signing key
+        env:
+          APT_GPG_PRIVATE_KEY: ${{ secrets.APT_GPG_PRIVATE_KEY }}
+          APT_GPG_PASSPHRASE: ${{ secrets.APT_GPG_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          export GNUPGHOME="$RUNNER_TEMP/gnupg"
+          mkdir -m 700 "$GNUPGHOME"
+          printf '%s' "$APT_GPG_PRIVATE_KEY" |
+            gpg --batch --import
+          gpg --batch --list-secret-keys \
+            866F87FFD6245D8A
+
+      - name: Prepare repository
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          if git clone --branch gh-pages \
+            "https://github.com/${GITHUB_REPOSITORY}.git" public; then
+            echo "Existing Pages repository found."
+          else
+            rm -rf public
+            mkdir public
+            git -C public init -b gh-pages
+          fi
+
+          git -C public config user.name "github-actions[bot]"
+          git -C public config user.email \
+            "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C public remote set-url origin \
+            "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+
+          mkdir -p public/pool/main/u/universal-search
+          cp "$RUNNER_TEMP"/debs/*.deb \
+            public/pool/main/u/universal-search/
+
+          mkdir -p public/dists/stable/main
+
+          for arch in amd64 arm64 armhf i386 ppc64el riscv64 s390x; do
+            mkdir -p "public/dists/stable/main/binary-${arch}"
+            dpkg-scanpackages --arch "$arch" \
+              public/pool /dev/null \
+              > "public/dists/stable/main/binary-${arch}/Packages" \
+              || true
+            gzip -9fk \
+              "public/dists/stable/main/binary-${arch}/Packages"
+          done
+
+      - name: Create and sign repository metadata
+        env:
+          APT_GPG_PASSPHRASE: ${{ secrets.APT_GPG_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          export GNUPGHOME="$RUNNER_TEMP/gnupg"
+          cd public
+
+          apt-ftparchive \
+            -o APT::FTPArchive::Release::Origin="fokompo" \
+            -o APT::FTPArchive::Release::Label="Universal Search" \
+            -o APT::FTPArchive::Release::Suite="stable" \
+            -o APT::FTPArchive::Release::Codename="stable" \
+            -o APT::FTPArchive::Release::Architectures="amd64 arm64 armhf i386 ppc64el riscv64 s390x" \
+            -o APT::FTPArchive::Release::Components="main" \
+            -o APT::FTPArchive::Release::Description="Universal Search APT repository" \
+            release dists/stable > dists/stable/Release
+
+          gpg --batch --yes --pinentry-mode loopback \
+            --passphrase "${APT_GPG_PASSPHRASE:-}" \
+            --local-user 866F87FFD6245D8A \
+            --clearsign \
+            --output dists/stable/InRelease \
+            dists/stable/Release
+
+          gpg --batch --yes --pinentry-mode loopback \
+            --passphrase "${APT_GPG_PASSPHRASE:-}" \
+            --local-user 866F87FFD6245D8A \
+            --armor --detach-sign \
+            --output dists/stable/Release.gpg \
+            dists/stable/Release
+
+      - name: Publish GitHub Pages
+        run: |
+          set -e
+          git -C public add .
+          if git -C public diff --cached --quiet; then
+            echo "No repository changes to publish."
+          else
+            git -C public commit -m "Publish APT repository"
+            git -C public push origin gh-pages
+          fi

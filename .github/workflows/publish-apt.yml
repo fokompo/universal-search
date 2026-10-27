@@ -50,38 +50,31 @@ jobs:
         run: |
           set -euo pipefail
 
-          if git clone --branch gh-pages \
-            "https://github.com/${GITHUB_REPOSITORY}.git" public; then
+          if git clone --branch gh-pages "https://github.com/${GITHUB_REPOSITORY}.git" public; then
             echo "Existing Pages repository found."
           else
             rm -rf public
             mkdir public
             git -C public init -b gh-pages
+            git -C public remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           fi
 
           git -C public config user.name "github-actions[bot]"
-          git -C public config user.email \
-            "41898282+github-actions[bot]@users.noreply.github.com"
-          git -C public remote set-url origin \
-            "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git -C public config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C public remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
 
           mkdir -p public/pool/main/u/universal-search
-          cp "$RUNNER_TEMP"/debs/*.deb \
-            public/pool/main/u/universal-search/
-
+          cp "$RUNNER_TEMP"/debs/*.deb public/pool/main/u/universal-search/
           mkdir -p public/dists/stable/main
 
           for arch in amd64 arm64 armhf i386 ppc64el riscv64 s390x; do
             mkdir -p "public/dists/stable/main/binary-${arch}"
-            dpkg-scanpackages --arch "$arch" \
-              public/pool /dev/null \
-              > "public/dists/stable/main/binary-${arch}/Packages" \
-              || true
-            gzip -9fk \
-              "public/dists/stable/main/binary-${arch}/Packages"
+            dpkg-scanpackages --arch "$arch" public/pool /dev/null > "public/dists/stable/main/binary-${arch}/Packages" || true
+            gzip -9fk "public/dists/stable/main/binary-${arch}/Packages"
           done
 
       - name: Create and sign repository metadata
+
         env:
           APT_GPG_PASSPHRASE: ${{ secrets.APT_GPG_PASSPHRASE }}
         run: |

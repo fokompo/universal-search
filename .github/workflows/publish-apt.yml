@@ -61,6 +61,10 @@ jobs:
 
           git -C public config user.name "github-actions[bot]"
           git -C public config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if ! git -C public remote get-url origin >/dev/null 2>&1; then
+            git -C public remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          fi
+
           git -C public remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
 
           mkdir -p public/pool/main/u/universal-search

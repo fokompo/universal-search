@@ -73,7 +73,7 @@ jobs:
 
           for arch in amd64 arm64 armhf i386 ppc64el riscv64 s390x; do
             mkdir -p "public/dists/stable/main/binary-${arch}"
-            dpkg-scanpackages --arch "$arch" public/pool /dev/null > "public/dists/stable/main/binary-${arch}/Packages" || true
+            (cd public && dpkg-scanpackages --arch "$arch" pool /dev/null) > "public/dists/stable/main/binary-${arch}/Packages" || true
             gzip -9fk "public/dists/stable/main/binary-${arch}/Packages"
           done
 

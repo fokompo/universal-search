@@ -113,6 +113,7 @@ jobs:
       - name: Publish GitHub Pages
         run: |
           set -e
+          cp .github/keys/apt-public-key.asc public/apt-public-key.asc
           git -C public add .
           if git -C public diff --cached --quiet; then
             echo "No repository changes to publish."

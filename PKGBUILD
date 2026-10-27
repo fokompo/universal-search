@@ -1,10 +1,11 @@
 pkgname=universal-search
 pkgver=1.0.0
-pkgrel=1
+pkgrel=2
 pkgdesc="Search Google, YouTube, GitHub, Wikipedia and more from the terminal"
+url='https://github.com/fokompo/universal-search'
 arch=('any')
 license=('MIT')
-depends=('bash' 'python' 'xdg-utils')
+depends=('bash' 'xdg-utils')
 source=('search')
 sha256sums=('SKIP')
 

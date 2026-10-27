@@ -1,26 +1,26 @@
 # Universal Search
 
-Universal Search — термінальний пошук із кольоровим інтерфейсом та CLI-режимом.
+Universal Search — terminal search with a colorful interactive menu and CLI mode.
 
-## Можливості
+## Features
 
-- Інтерактивне меню.
-- CLI-запуск.
-- Команди з великими й малими літерами.
-- Установлення в `/usr/local`.
-- Деінсталяція без видалення файлів проєкту.
+- Interactive menu.
+- CLI mode when arguments are supplied.
+- Commands: `s`, `S`, `search`, `Search`.
+- Universal installer for Linux.
+- Debian package support.
+- Arch Linux package support through `PKGBUILD`.
 
-## Встановлення
+## Universal installation
 
-Потрібні Bash та `curl` або `wget`. Для системного встановлення потрібен
-`sudo` або root-доступ.
+Requirements: Bash, `curl` or `wget`, and `sudo` or root access.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/fokompo/universal-search/main/install.sh -o install.sh
 bash install.sh
 ```
 
-Або після клонування репозиторію:
+Or install from a cloned repository:
 
 ```bash
 git clone https://github.com/fokompo/universal-search.git
@@ -28,45 +28,74 @@ cd universal-search
 bash install.sh
 ```
 
-Інсталятор використовує локальний файл `search`, якщо він є поруч.
-Інакше завантажує його з гілки `main`.
+The installer uses the local `search` file if present; otherwise it downloads
+the published version from GitHub.
 
-## Команди
+## Commands
 
-| Команда | Призначення |
-|---|---|
-| `S` | Інтерактивне меню |
-| `Search` | Інтерактивне меню |
-| `s` | CLI-режим |
-| `search` | CLI-режим |
+All four commands open the interactive menu without arguments:
 
-У CLI-режимі доступні аргументи, які підтримує сама програма. Щоб побачити
-довідку, запусти `search --help`, якщо ця опція підтримується поточною версією.
+```bash
+s
+S
+search
+Search
+```
 
-## Видалення
+When arguments are supplied, they are passed to CLI mode. For help, run:
 
-У клонованому репозиторії:
+```bash
+search --help
+```
+
+## Debian package
+
+On a Debian-based system, install a built package with:
+
+```bash
+sudo apt install ./universal-search_1.0.0-1_all.deb
+```
+
+Or:
+
+```bash
+sudo dpkg -i ./universal-search_1.0.0-1_all.deb
+```
+
+To build the package on Debian or Ubuntu, install the packaging tools and run:
+
+```bash
+sudo apt install build-essential debhelper
+dpkg-buildpackage -us -uc -b
+```
+
+## Arch Linux
+
+The repository includes a `PKGBUILD` for Arch-based distributions.
+
+## Uninstallation
+
+For the universal installer, run the repository's `uninstall.sh`:
 
 ```bash
 bash uninstall.sh
 ```
 
-Також можна завантажити деінсталятор і запустити його:
+For a Debian package:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/fokompo/universal-search/main/uninstall.sh -o uninstall.sh
-bash uninstall.sh
+sudo apt remove universal-search
 ```
 
-## Підтримка Linux
+## Linux compatibility
 
-Інсталятор не використовує `pacman`, `apt` чи `dnf`: він встановлює програму
-у стандартні каталоги `/usr/local/lib` і `/usr/local/bin`. Це підходить для
-більшості дистрибутивів Linux, де доступні Bash та стандартні Unix-команди.
+The universal installer does not require `apt`, `pacman`, or `dnf`.
+It installs into `/usr/local/lib/universal-search` and `/usr/local/bin`.
+Those directories are normally available without manually editing `PATH`.
 
-Зовнішні інструменти, потрібні для окремих функцій самої програми, можуть
-встановлюватися через пакетний менеджер конкретного дистрибутива.
+The program uses `xdg-open` to open links. Install `xdg-utils` through
+your distribution's package manager if it is not already available.
 
-## Ліцензія
+## License
 
-MIT. Див. файл [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE).

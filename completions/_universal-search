@@ -1,0 +1,42 @@
+#compdef search s S Search
+
+_universal_search() {
+    local -a sites
+    sites=(
+        'g:Google'
+        'google:Google'
+        'yt:YouTube'
+        'youtube:YouTube'
+        'wiki:Wikipedia'
+        'gh:GitHub'
+        'github:GitHub'
+        'reddit:Reddit'
+        'ddg:DuckDuckGo'
+        'mdn:MDN Web Docs'
+        'arch:Arch Linux Wiki'
+        'wikiarch:Arch Linux Wiki'
+        'maps:Google Maps'
+        'images:Google Images'
+        'bing:Bing'
+        'brave:Brave Search'
+        'npm:npm packages'
+        'pypi:Python packages'
+        'rust:Rust documentation'
+    )
+
+    _arguments \
+        '(-p --private)'{-p,--private}'[Open in private mode]' \
+        '(-h --help)'{-h,--help}'[Show help]' \
+        '*:site or search terms:->terms'
+
+    case "$state" in
+        terms)
+            if (( CURRENT == 2 )) ||
+               { (( CURRENT == 3 )) && [[ "$words[2]" == "-p" || "$words[2]" == "--private" ]]; }; then
+                _describe 'search service' sites
+            fi
+            ;;
+    esac
+}
+
+_universal_search "$@"

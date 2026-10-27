@@ -1,0 +1,3 @@
+search usr/bin
+completions/search.bash usr/share/bash-completion/completions
+completions/_universal-search usr/share/zsh/site-functions

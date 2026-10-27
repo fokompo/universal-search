@@ -1,0 +1,14 @@
+Source: universal-search
+Section: utils
+Priority: optional
+Maintainer: fokompo <fokompo456@gmail.com>
+Build-Depends: debhelper-compat (= 13)
+Standards-Version: 4.6.2
+Rules-Requires-Root: no
+
+Package: universal-search
+Architecture: all
+Depends: ${misc:Depends}, bash, xdg-utils
+Description: Universal terminal search
+ Search Google, YouTube, GitHub, Wikipedia and more
+ from a colorful interactive terminal interface or CLI.

@@ -1,0 +1,7 @@
+Universal Search
+================
+
+All four command names (s, S, search, Search) launch the interactive
+menu when called without arguments. Arguments are passed to CLI mode.
+
+The package installs the program into /usr/bin.

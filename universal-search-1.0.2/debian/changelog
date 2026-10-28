@@ -1,0 +1,29 @@
+universal-search (1.0.5-1) unstable; urgency=medium
+
+  * Add a Python curses interface with category, site and details panels.
+  * Improve keyboard handling and private browser feedback.
+
+ -- fokompo <fokompo456@gmail.com>  Wed, 28 Oct 2026 20:40:00 +0000
+
+universal-search (1.0.4-1) unstable; urgency=medium
+
+  * Add a responsive three-panel search menu with site icons and details.
+  * Fix Enter-key handling and support case-insensitive menu shortcuts.
+  * Show private-browser availability and launch supported private windows.
+
+ -- fokompo <fokompo456@gmail.com>  Wed, 28 Oct 2026 20:35:00 +0000
+
+universal-search (1.0.3-1) unstable; urgency=medium
+
+  * Add URL preview, site groups, persistent favorites and browser selection.
+  * Add colorless mode and user-site shell completions.
+  * Refresh the interactive terminal interface.
+
+ -- fokompo <fokompo456@gmail.com>  Wed, 28 Oct 2026 20:00:00 +0000
+
+universal-search (1.0.2-1) unstable; urgency=medium
+
+  * Split the application into installable Bash modules.
+  * Keep history and application data in XDG user data directories.
+
+ -- fokompo <fokompo456@gmail.com>  Wed, 28 Oct 2026 00:00:00 +0000

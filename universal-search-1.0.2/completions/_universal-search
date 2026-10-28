@@ -1,0 +1,34 @@
+#compdef search s S Search
+
+_universal_search() {
+    local config_file="${XDG_CONFIG_HOME:-$HOME/.config}/universal-search/sites.conf"
+    local kind id label alias prefix group state
+    local -a sites=(google g youtube yt wiki github gh reddit ddg mdn arch maps images bing brave npm pypi rust)
+    local -a groups=(Web Media Knowledge Developer Community Maps Custom)
+    if [[ -r "$config_file" ]]; then
+        while IFS='|' read -r kind id label alias prefix group || [[ -n "${kind:-}" ]]; do
+            [[ -z "${kind:-}" || "$kind" == \#* ]] && continue
+            if [[ "$kind" == site ]]; then
+                sites+=("$id" "$alias")
+                [[ -n "${group:-}" ]] && groups+=("$group")
+            else
+                sites+=("$kind" "$label")
+            fi
+        done < "$config_file"
+    fi
+    _arguments \
+        '(-h --help)'{-h,--help}'[Show help]' \
+        '(-p --private)'{-p,--private}'[Open in private mode]' \
+        '--print-url[Print URL without opening]' \
+        '--favorites[Search favorite sites]' \
+        '--no-color[Disable interface colors]' \
+        '--browser[Select browser]:browser:(firefox chromium brave-browser google-chrome vivaldi)' \
+        '--group[Search all sites in a group]:group:->group' \
+        '*:site or query:->site'
+    case "$state" in
+        group) compadd -a groups ;;
+        site) compadd -a sites ;;
+    esac
+}
+
+_universal_search "$@"

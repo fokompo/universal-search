@@ -1,0 +1,8 @@
+search usr/bin
+src/*.sh usr/lib/universal-search/src
+tui/app.py usr/lib/universal-search/tui
+completions/search.bash usr/share/bash-completion/completions
+completions/_universal-search usr/share/zsh/site-functions
+config/sites.conf.example usr/share/universal-search
+README.md usr/share/doc/universal-search
+LICENSE usr/share/doc/universal-search

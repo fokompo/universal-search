@@ -1,0 +1,7 @@
+# Custom site list; copy to ${XDG_CONFIG_HOME:-$HOME/.config}/universal-search/sites.conf
+# Format: site|id|Display name|alias|URL prefix|Group
+site|stackoverflow|Stack Overflow|so|https://stackoverflow.com/search?q=|Developer
+site|aur|Arch User Repository|aur|https://aur.archlinux.org/packages?K=|Developer
+
+# Legacy four-column format is also accepted:
+# example|Example Search|ex|https://example.org/search?q=

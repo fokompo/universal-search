@@ -1,0 +1,533 @@
+#!/usr/bin/env bash
+set -u
+
+SCRIPT_PATH="$(readlink -f -- "${BASH_SOURCE[0]}")"
+APP_DIR="$(cd -- "$(dirname -- "$SCRIPT_PATH")" && pwd)"
+if [[ -d "$APP_DIR/src" ]]; then
+    MODULE_DIR="$APP_DIR/src"
+elif [[ -d "${UNIVERSAL_SEARCH_LIBDIR:-/usr/lib/universal-search}/src" ]]; then
+    MODULE_DIR="${UNIVERSAL_SEARCH_LIBDIR:-/usr/lib/universal-search}/src"
+else
+    printf 'Universal Search modules not found.\n' >&2
+    exit 1
+fi
+if [[ -f "$APP_DIR/tui/app.py" ]]; then
+    TUI_APP="$APP_DIR/tui/app.py"
+elif [[ -f "${UNIVERSAL_SEARCH_LIBDIR:-/usr/lib/universal-search}/tui/app.py" ]]; then
+    TUI_APP="${UNIVERSAL_SEARCH_LIBDIR:-/usr/lib/universal-search}/tui/app.py"
+else
+    TUI_APP=""
+fi
+source "$MODULE_DIR/config.sh"
+source "$MODULE_DIR/sites.sh"
+source "$MODULE_DIR/batch.sh"
+source "$MODULE_DIR/results.sh"
+load_settings
+build_group_names
+
+R=$'\033[0m'
+B=$'\033[1m'
+M=$'\033[38;2;105;220;205m'
+V=$'\033[38;2;177;156;255m'
+Y=$'\033[38;2;245;196;112m'
+D=$'\033[38;2;130;145;165m'
+W=$'\033[38;2;230;237;247m'
+SEL=$'\033[48;2;42;72;91;38;2;255;255;255m'
+PANEL=$'\033[48;2;20;27;39m'
+SOFT=$'\033[38;2;167;181;201m'
+
+
+filter=""
+filter_mode=0
+selected=0
+private=0
+mode=menu
+query=""
+history=()
+matches=()
+picked=()
+selected_group=0
+group_arg=""
+favorites_only=0
+print_url=0
+interactive_active=0
+focus_panel=sites
+
+apply_color_mode() {
+    R=$'\033[0m'; B=$'\033[1m'; M=$'\033[38;2;105;220;205m'; V=$'\033[38;2;177;156;255m'
+    Y=$'\033[38;2;245;196;112m'; D=$'\033[38;2;130;145;165m'; W=$'\033[38;2;230;237;247m'; SEL=$'\033[48;2;42;72;91;38;2;255;255;255m'
+    PANEL=$'\033[48;2;20;27;39m'; SOFT=$'\033[38;2;167;181;201m'
+    if [[ "$color_mode" == never || -n "${NO_COLOR:-}" || ! -t 1 ]]; then
+        R=""; B=""; M=""; V=""; Y=""; D=""; W=""; SEL=""; PANEL=""; SOFT=""
+    fi
+}
+
+cleanup() {
+    (( interactive_active )) || return 0
+    printf '\033[0m\033[?25h\033[?1049l'
+    stty echo 2>/dev/null || true
+}
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+launch_interactive() {
+    if [[ -n "$TUI_APP" ]] && command -v python3 >/dev/null 2>&1 && python3 -c 'import curses' >/dev/null 2>&1; then
+        exec python3 "$TUI_APP" "$SCRIPT_PATH"
+    fi
+    interactive_search
+}
+
+build_matches() {
+    local i needle="${filter,,}" active_group="${groups[selected_group]:-All}" site_group
+    matches=()
+
+    for ((i=0; i<${#sites[@]}; i++)); do
+        site_group="${site_groups[i]}"
+        [[ "$active_group" == All || "$site_group" == "$active_group" ]] || continue
+        [[ "$active_group" != Favorites ]] || is_favorite "${sites[i]}" || continue
+        if [[ -z "$needle" ||
+              "${labels[i],,}" == *"$needle"* ||
+              "${aliases[i],,}" == *"$needle"* ||
+              "${sites[i],,}" == *"$needle"* ]]; then
+            matches+=("$i")
+        fi
+    done
+
+    if ((${#matches[@]} == 0)); then
+        selected=0
+    elif ((selected >= ${#matches[@]})); then
+        selected=$((${#matches[@]} - 1))
+    fi
+}
+
+draw_menu() {
+    local i row idx mark star chosen=0 list_offset=0 group_offset=0 group shown_group card
+    local header_cols rows side_w mid_w detail_w description favorite_text private_text category_title sites_title
+    local -a detail_lines=()
+    build_matches
+    read -r ui_rows ui_cols < <(stty size 2>/dev/null || printf '24 80\n')
+    (( ui_cols < 80 )) && ui_cols=80
+    (( ui_rows < 19 )) && ui_rows=19
+    side_w=$((ui_cols / 5 + 4))
+    mid_w=$(((ui_cols - 4) * 44 / 100))
+    detail_w=$((ui_cols - side_w - mid_w - 4))
+    rows=$((ui_rows - 14))
+    (( rows < 5 )) && rows=5
+    (( rows > 14 )) && rows=14
+    (( selected >= rows )) && list_offset=$((selected - rows + 1))
+    (( selected_group >= rows )) && group_offset=$((selected_group - rows + 1))
+    if ((private)); then private_text="PRIVATE · $(private_browser_label || true)"; else private_text='Normal window'; fi
+
+    for ((i=0; i<${#picked[@]}; i++)); do
+        [[ "${picked[i]:-0}" == 1 ]] && chosen=$((chosen + 1))
+    done
+
+    if ((${#matches[@]})); then
+        idx="${matches[selected]}"
+        description="$(site_description "${sites[idx]}")"
+        if is_favorite "${sites[idx]}"; then favorite_text='★ In favorites'; else favorite_text='☆ Add to favorites'; fi
+        detail_lines=("$(site_icon "${sites[idx]}")  WEB DESTINATION" "${labels[idx]}" "Shortcut: ${aliases[idx]}" "Category: ${site_groups[idx]}" "$description" "" "OPEN SEARCH" "s ${aliases[idx]} <query>" "$favorite_text" "Browser: $(browser_label)" "$private_text")
+    else
+        idx=-1
+        detail_lines=("◈  WEB DESTINATION" "Nothing selected" "" "Try another category" "or clear your filter." "" "" "" "" "" "")
+    fi
+
+    printf '\033[H\033[2J'
+    printf '%s╭' "$M"; printf -v header_cols '%*s' "$((ui_cols - 2))" ''; printf '%s╮%s\n' "${header_cols// /─}" "$M"
+    print_full_row '◈  UNIVERSAL SEARCH                                      YOUR WEB, IN ONE PLACE'
+    print_full_row 'A quick, focused way to search the places you use every day.'
+    if ((filter_mode)); then
+        print_full_row "⌕  FILTERING: ${filter:-type to filter…}    (Enter to finish · Esc to clear)"
+    else
+        print_full_row "⌕  ${filter:-Search filter is off · press / to filter}"
+    fi
+    printf '%s├' "$M"; printf -v header_cols '%*s' "$((ui_cols - 2))" ''; printf '%s┤%s\n' "${header_cols// /─}" "$M"
+    category_title='CATEGORIES'; sites_title="SITES  ·  ${#matches[@]} found"
+    [[ "$focus_panel" == groups ]] && category_title='CATEGORIES  ◂' || sites_title="SITES  ·  ${#matches[@]} found  ◂"
+    print_three_row "$category_title" "$sites_title" 'DETAILS' 0 0
+    printf '%s├' "$M"; printf -v header_cols '%*s' "$side_w" ''; printf '%s┬' "${header_cols// /─}"; printf -v header_cols '%*s' "$mid_w" ''; printf '%s┬' "${header_cols// /─}"; printf -v header_cols '%*s' "$detail_w" ''; printf '%s┤%s\n' "${header_cols// /─}" "$M"
+
+    for ((i=0; i<rows; i++)); do
+        row=$((group_offset + i))
+        if ((row < ${#groups[@]})); then
+            group="${groups[row]}"
+            case "$group" in
+                All) shown_group='▦  All sites' ;;
+                Favorites) shown_group='★  Favorites' ;;
+                Web) shown_group='⌕  Web' ;;
+                Media) shown_group='▶  Media' ;;
+                Knowledge) shown_group='◇  Knowledge' ;;
+                Developer) shown_group='⌘  Developer' ;;
+                Community) shown_group='◎  Community' ;;
+                Maps) shown_group='⌖  Maps' ;;
+                *) shown_group="◦  $group" ;;
+            esac
+            [[ $row -eq $selected_group ]] && group_selected=1 || group_selected=0
+        else
+            shown_group=''; group_selected=0
+        fi
+
+        row=$((list_offset + i))
+        if ((row < ${#matches[@]})); then
+            idx="${matches[row]}"
+            mark='○'; [[ "${picked[idx]:-0}" == 1 ]] && mark='✓'
+            star=''; is_favorite "${sites[idx]}" && star='★'
+            card="$(site_icon "${sites[idx]}")  $mark  ${labels[idx]}  [${aliases[idx]}]  $star"
+            [[ $row -eq $selected ]] && site_selected=1 || site_selected=0
+        else
+            card=''; site_selected=0
+        fi
+
+        description="${detail_lines[i]:-}"
+        print_three_row "$shown_group" "$card" "$description" "$group_selected" "$site_selected"
+    done
+
+    printf '%s├' "$M"; printf -v header_cols '%*s' "$side_w" ''; printf '%s┴' "${header_cols// /─}"; printf -v header_cols '%*s' "$mid_w" ''; printf '%s┴' "${header_cols// /─}"; printf -v header_cols '%*s' "$detail_w" ''; printf '%s┤%s\n' "${header_cols// /─}" "$M"
+    if ((private)); then private_text="● $private_text"; else private_text='● READY'; fi
+    print_full_row "$private_text    Browser: $(browser_label)    $chosen selected    Category: ${groups[selected_group]}"
+    printf '%s├' "$M"; printf -v header_cols '%*s' "$((ui_cols - 2))" ''; printf '%s┤%s\n' "${header_cols// /─}" "$M"
+    print_full_row '↑/↓ Move  ←/→ Pane  Enter Search  / Filter  f Favorite  Space Select  q Quit'
+    print_full_row 'G Category  p Private window  b Browser  c Theme  Esc Clear filter / Back'
+    printf '%s╰' "$M"; printf -v header_cols '%*s' "$((ui_cols - 2))" ''; printf '%s╯%s\n' "${header_cols// /─}" "$M"
+}
+
+print_full_row() {
+    local text="$1" width=$((ui_cols - 6))
+    printf '%s│%s  %s%-*.*s%s  %s│%s\n' "$M" "$R" "$SOFT" "$width" "$width" "$text" "$R" "$M" "$R"
+}
+
+print_three_row() {
+    local left="$1" middle="$2" right="$3" select_left="${4:-0}" select_middle="${5:-0}"
+    printf '%s│%s' "$M" "$R"
+    if ((select_left)); then printf '%s' "$SEL"; fi
+    printf ' %-*.*s' "$((side_w - 1))" "$((side_w - 1))" "$left"
+    if ((select_left)); then printf '%s' "$R"; fi
+    printf '%s│%s' "$M" "$R"
+    if ((select_middle)); then printf '%s' "$SEL"; fi
+    printf ' %-*.*s' "$((mid_w - 1))" "$((mid_w - 1))" "$middle"
+    if ((select_middle)); then printf '%s' "$R"; fi
+    printf '%s│%s' "$M" "$R"
+    printf ' %-*.*s' "$((detail_w - 1))" "$((detail_w - 1))" "$right"
+    printf '%s│%s\n' "$M" "$R"
+}
+
+site_description() {
+    case "$1" in
+        google|ddg|bing|brave) printf 'Search the wider web.' ;;
+        youtube) printf 'Find videos, channels and creators.' ;;
+        wiki) printf 'Explore the free encyclopedia.' ;;
+        github) printf 'Search code, projects and issues.' ;;
+        reddit) printf 'Search discussions and communities.' ;;
+        mdn|rust|arch) printf 'Find documentation and technical answers.' ;;
+        maps) printf 'Look up places and directions.' ;;
+        images) printf 'Discover images across the web.' ;;
+        npm|pypi) printf 'Find packages and developer tools.' ;;
+        *) printf 'Open this search destination in your browser.' ;;
+    esac
+}
+
+site_icon() {
+    case "$1" in
+        google|bing|brave|ddg) printf '◉' ;;
+        youtube) printf '▶' ;;
+        wiki) printf 'W' ;;
+        github) printf '◈' ;;
+        reddit) printf '◎' ;;
+        mdn|rust|arch) printf '⌘' ;;
+        maps) printf '⌖' ;;
+        images) printf '▧' ;;
+        npm) printf '⬡' ;;
+        pypi) printf '◆' ;;
+        *) printf '◦' ;;
+    esac
+}
+
+draw_query() {
+    local i count=0
+    printf '\033[H\033[2J'
+    printf '%s╭──────────────────────────────────────────────────────────────────────────────╮%s\n' "$M" "$R"
+    printf '%s│%s  %s◈ UNIVERSAL SEARCH%s  /  %sNEW SEARCH%s                                       %s│%s\n' "$M" "$R" "$B$M" "$R" "$V" "$R" "$M" "$R"
+    printf '%s│%s  %sA clean start for your next discovery.%s                                     %s│%s\n' "$M" "$R" "$SOFT" "$R" "$M" "$R"
+    printf '%s├──────────────────────────────────────────────────────────────────────────────┤%s\n' "$M" "$R"
+
+    if ((private)); then
+        printf '%s│%s  MODE  %s● PRIVATE · %s%s                                        %s│%s\n' "$M" "$R" "$Y" "$(private_browser_label || true)" "$R" "$M" "$R"
+    else
+        printf '%s│%s  MODE  %s● NORMAL WINDOW%s                                                   %s│%s\n' "$M" "$R" "$M" "$R" "$M" "$R"
+    fi
+
+    printf '%s├──────────────────────────────────────────────────────────────────────────────┤%s\n' "$M" "$R"
+    printf '%s│%s  %sTARGETS%s                                                                     %s│%s\n' "$M" "$R" "$B" "$R" "$M" "$R"
+
+    for ((i=0; i<${#sites[@]}; i++)); do
+        if [[ "${picked[i]:-0}" == 1 ]]; then
+            printf '%s│%s  %s✓ %s%s\n' "$M" "$R" "$M" "${labels[i]}" "$R"
+            count=$((count + 1))
+        fi
+    done
+
+    if ((count == 0)); then
+        if ((${#matches[@]})); then
+            printf '%s│%s  %s%s%s\n' "$M" "$R" "$M" "${labels[${matches[selected]}]}" "$R"
+        else
+            printf '%s│%s  Google (default)\n' "$M" "$R"
+        fi
+    fi
+
+    printf '%s├──────────────────────────────────────────────────────────────────────────────┤%s\n' "$M" "$R"
+    printf '%s│%s  %sWHAT ARE YOU LOOKING FOR?%s                                               %s│%s\n' "$M" "$R" "$V" "$R" "$M" "$R"
+    printf '%s│%s  %s› %-71.71s%s│%s\n' "$M" "$R" "$W" "${query:-Start typing your search...}" "$R" "$M" "$R"
+    printf '%s├──────────────────────────────────────────────────────────────────────────────┤%s\n' "$M" "$R"
+    printf '%s│%s  %sEnter%s Launch  %s↑/↓%s History  %sEsc%s Back                                    %s│%s\n' \
+        "$M" "$R" "$M" "$R" "$M" "$R" "$M" "$R" "$M" "$R"
+    printf '%s╰──────────────────────────────────────────────────────────────────────────────╯%s\n' "$M" "$R"
+}
+
+read_key() {
+    IFS= read -rsn1 REPLY || return 1
+
+    case "$REPLY" in
+        ''|$'\r'|$'\n') REPLY=ENTER ;;
+    esac
+
+    if [[ "$REPLY" == $'\x1b' ]]; then
+        local seq=""
+        IFS= read -rsn2 -t 0.15 seq || true
+        case "$seq" in
+            '[A'|'OA') REPLY=UP ;;
+            '[B'|'OB') REPLY=DOWN ;;
+            '[C'|'OC') REPLY=RIGHT ;;
+            '[D'|'OD') REPLY=LEFT ;;
+            *) REPLY=ESC ;;
+        esac
+    fi
+}
+
+collect_query_targets() {
+    local i
+    query_targets=()
+    if [[ -n "$group_arg" ]]; then
+        for ((i=0; i<${#sites[@]}; i++)); do [[ "${site_groups[i],,}" == "${group_arg,,}" ]] && query_targets+=("$i"); done
+    elif ((favorites_only)); then
+        for ((i=0; i<${#sites[@]}; i++)); do is_favorite "${sites[i]}" && query_targets+=("$i"); done
+    elif [[ -n "${selected_site:-}" ]]; then
+        i="$(site_index "$selected_site")" && query_targets+=("$i")
+    elif ((${#picked[@]})); then
+        for ((i=0; i<${#sites[@]}; i++)); do [[ "${picked[i]:-0}" == 1 ]] && query_targets+=("$i"); done
+    fi
+    if ((${#query_targets[@]} == 0)) && ((${#matches[@]})); then query_targets+=("${matches[selected]}"); fi
+    if ((${#query_targets[@]} == 0)); then query_targets=(0); fi
+}
+
+urls_for_query() {
+    local q="$1" idx
+    query_targets=(); collect_query_targets
+    for idx in "${query_targets[@]}"; do printf '%s%s\n' "$(url_for "${sites[idx]}")" "$(urlencode "$q")"; done
+}
+
+group_exists() {
+    local requested="${1,,}" group
+    for group in "${site_groups[@]}"; do [[ "${group,,}" == "$requested" ]] && return 0; done
+    return 1
+}
+
+launch_query() {
+    local q="$1" target rc=0
+    [[ -n "$q" ]] || return 0
+    if is_url "$q"; then open_target "$q" "$private"; return $?; fi
+    remember_query "$q"
+    while IFS= read -r target; do [[ -n "$target" ]] && open_target "$target" "$private" || rc=$?; done < <(urls_for_query "$q")
+    return "$rc"
+}
+
+interactive_search() {
+    local key idx history_pos history_draft="" rc error_message
+    picked=()
+    for ((idx=0; idx<${#sites[@]}; idx++)); do picked[idx]=0; done
+
+    load_history
+    interactive_active=1
+    trap cleanup EXIT
+    trap 'exit 130' INT
+    trap 'exit 143' TERM
+    stty -echo 2>/dev/null || true
+    printf '\033[?1049h\033[?25l'
+
+    while true; do
+        if [[ "$mode" == menu ]]; then draw_menu; else draw_query; fi
+        read_key || return 0
+        key="$REPLY"
+
+        if [[ "$mode" == menu ]]; then
+            if ((filter_mode)); then
+                case "$key" in
+                    ESC) filter=""; selected=0; filter_mode=0 ;;
+                    ENTER) filter_mode=0 ;;
+                    $'\x7f'|$'\x08') filter="${filter%?}"; selected=0 ;;
+                    *) [[ ${#key} -eq 1 ]] && { filter+="$key"; selected=0; } ;;
+                esac
+                continue
+            fi
+            case "$key" in
+                UP)
+                    if [[ "$focus_panel" == groups ]]; then
+                        selected_group=$(((selected_group - 1 + ${#groups[@]}) % ${#groups[@]})); selected=0
+                    else
+                        build_matches
+                        if ((${#matches[@]})); then selected=$(((selected - 1 + ${#matches[@]}) % ${#matches[@]})); fi
+                    fi
+                    ;;
+                DOWN)
+                    if [[ "$focus_panel" == groups ]]; then
+                        selected_group=$(((selected_group + 1) % ${#groups[@]})); selected=0
+                    else
+                        build_matches
+                        if ((${#matches[@]})); then selected=$(((selected + 1) % ${#matches[@]})); fi
+                    fi
+                    ;;
+                LEFT) focus_panel=groups ;;
+                RIGHT|$'\t') focus_panel=sites ;;
+                ESC) [[ -n "$filter" ]] && { filter=""; selected=0; } || return 0 ;;
+                ENTER)
+                    if [[ "$focus_panel" == groups ]]; then
+                        focus_panel=sites
+                    else
+                        mode=query
+                        query=""
+                        history_pos=${#history[@]}
+                        history_draft=""
+                    fi
+                    ;;
+                ' ')
+                    build_matches
+                    if ((${#matches[@]})); then
+                        idx="${matches[selected]}"
+                        if [[ "${picked[idx]}" == 1 ]]; then picked[idx]=0; else picked[idx]=1; fi
+                    fi
+                    ;;
+                f|F)
+                    build_matches
+                    ((${#matches[@]})) && toggle_favorite "${matches[selected]}"
+                    ;;
+                G|g) selected_group=$(((selected_group + 1) % ${#groups[@]})); selected=0 ;;
+                P|p) ((private = 1 - private)) ;;
+                B|b) cycle_browser ;;
+                C|c)
+                    case "$color_mode" in auto) color_mode=never ;; never) color_mode=always ;; *) color_mode=auto ;; esac
+                    write_settings
+                    apply_color_mode
+                    ;;
+                /) filter_mode=1 ;;
+                q|Q) return 0 ;;
+            esac
+        else
+            case "$key" in
+                ESC) mode=menu ;;
+                UP)
+                    if ((${#history[@]})); then
+                        if ((history_pos == ${#history[@]})); then history_draft="$query"; fi
+                        ((history_pos > 0)) && history_pos=$((history_pos - 1))
+                        query="${history[history_pos]}"
+                    fi
+                    ;;
+                DOWN)
+                    if ((history_pos < ${#history[@]})); then
+                        history_pos=$((history_pos + 1))
+                        if ((history_pos == ${#history[@]})); then
+                            query="$history_draft"
+                        else
+                            query="${history[history_pos]}"
+                        fi
+                    fi
+                    ;;
+                $'\x7f'|$'\x08') query="${query%?}" ;;
+                ENTER)
+                    if [[ -n "$query" ]]; then
+                        rc=0
+                        launch_query "$query" || rc=$?
+                        if ((rc)); then
+                            error_message="${OPEN_ERROR:-Search could not be opened. Check the selected browser.}"
+                            cleanup
+                            interactive_active=0
+                            printf '%s\n' "$error_message" >&2
+                            return "$rc"
+                        fi
+                        return 0
+                    fi
+                    ;;
+                *) [[ ${#key} -eq 1 ]] && query+="$key" ;;
+            esac
+        fi
+    done
+}
+
+show_help() {
+    cat <<'HELP'
+Universal Search 1.0.5
+Usage:
+  search [site] query terms
+  search --print-url [site] query terms
+  search --group GROUP query terms
+  search --favorites query terms
+  search --browser NAME [site] query terms
+  S                              Interactive menu
+
+Options:
+  -p, --private             Private/incognito mode
+  --print-url               Print URL(s) without opening a browser
+  --group GROUP             Search all sites in a group
+  --favorites               Search all favorite sites
+  --browser NAME            Use a browser for this command
+  --no-color, --plain       Disable interface colors
+  -h, --help                Show help
+
+The interactive menu has category, site and detail panels. Press / to filter,
+f to toggle favorites, Enter to search and q to exit. See README.md for setup.
+HELP
+}
+
+private=0; print_url=0; no_color=0; favorites_only=0; group_arg=""; interactive_requested=0
+args=()
+while (($#)); do
+    case "$1" in
+        -p|--private) private=1 ;;
+        -h|--help) show_help; exit 0 ;;
+        --print-url) print_url=1 ;;
+        --no-color|--plain) color_mode=never ;;
+        --favorites) favorites_only=1; group_arg="" ;;
+        --group)
+            (($# >= 2)) || { printf 'Missing group name after --group.\n' >&2; exit 2; }
+            group_arg="$2"; favorites_only=0; shift ;;
+        --browser)
+            (($# >= 2)) || { printf 'Missing browser name after --browser.\n' >&2; exit 2; }
+            browser_choice="$2"; shift ;;
+        -i|--interactive) interactive_requested=1 ;;
+        --) shift; args+=("$@"); break ;;
+        *) args+=("$1") ;;
+    esac
+    shift
+done
+apply_color_mode
+if ((${#args[@]} == 0)) && ((interactive_requested)) && [[ -t 0 && -t 1 ]]; then launch_interactive; exit $?; fi
+if ((${#args[@]} == 0)) && [[ -t 0 && -t 1 && "${0##*/}" =~ ^(s|S|search|Search)$ ]]; then launch_interactive; exit $?; fi
+if ((${#args[@]} == 0)); then show_help; exit 0; fi
+
+selected_site=""
+if [[ -z "$group_arg" ]] && ((favorites_only == 0)); then
+    if is_url "${args[0]}" && ((${#args[@]} == 1)); then
+        if ((print_url)); then printf '%s\n' "${args[0]}"; else open_target "${args[0]}" "$private"; fi
+        exit $?
+    elif ((${#args[@]} >= 2)) && url_for "${args[0]}" >/dev/null 2>&1; then
+        selected_site="${args[0]}"; args=("${args[@]:1}")
+    fi
+fi
+query_text="${args[*]}"
+if [[ -z "$query_text" ]]; then printf 'Search query is empty.\n' >&2; exit 2; fi
+if [[ -n "$group_arg" ]] && ! group_exists "$group_arg"; then
+    printf 'Unknown group: %s\n' "$group_arg" >&2; exit 2
+fi
+if ((favorites_only)) && ((${#favorite_ids[@]} == 0)); then printf 'No favorite sites configured.\n' >&2; exit 2; fi
+if ((print_url)); then urls_for_query "$query_text"; exit 0; fi
+remember_query "$query_text"
+while IFS= read -r target; do [[ -n "$target" ]] && open_target "$target" "$private"; done < <(urls_for_query "$query_text")

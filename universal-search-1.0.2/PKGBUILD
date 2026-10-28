@@ -1,0 +1,27 @@
+pkgname=universal-search
+pkgver=1.0.5
+pkgrel=1
+pkgdesc="Search the web from an interactive terminal menu or CLI"
+url='https://github.com/fokompo/universal-search'
+arch=('any')
+license=('MIT')
+depends=('bash' 'coreutils' 'xdg-utils' 'python')
+source=()
+sha256sums=()
+
+package() {
+    install -Dm755 "$startdir/search" "$pkgdir/usr/bin/search"
+    install -Dm644 "$startdir/src/sites.sh" "$pkgdir/usr/lib/universal-search/src/sites.sh"
+    install -Dm644 "$startdir/src/config.sh" "$pkgdir/usr/lib/universal-search/src/config.sh"
+    install -Dm644 "$startdir/src/batch.sh" "$pkgdir/usr/lib/universal-search/src/batch.sh"
+    install -Dm644 "$startdir/src/results.sh" "$pkgdir/usr/lib/universal-search/src/results.sh"
+    install -Dm644 "$startdir/tui/app.py" "$pkgdir/usr/lib/universal-search/tui/app.py"
+    install -Dm644 "$startdir/completions/search.bash" "$pkgdir/usr/share/bash-completion/completions/search"
+    install -Dm644 "$startdir/completions/_universal-search" "$pkgdir/usr/share/zsh/site-functions/_universal-search"
+    install -Dm644 "$startdir/config/sites.conf.example" "$pkgdir/usr/share/universal-search/sites.conf.example"
+    install -Dm644 "$startdir/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+    cd "$pkgdir/usr/bin"
+    ln -s search s
+    ln -s search S
+    ln -s search Search
+}

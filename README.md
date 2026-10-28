@@ -42,6 +42,8 @@ The installer uses the local `search` file if available; otherwise, it downloads
 
 ## Usage
 
+> **Version compatibility:** The examples below describe the current project syntax. Available commands and options may differ between releases or installation methods. Run `search --help` to check the options supported by your installed version. If a command does not work, please report your Linux distribution, installation method, package version, and the output of `search --help`.
+
 ### Interactive Menu
 
 Run any of these commands without arguments to open the interactive menu:
@@ -136,17 +138,17 @@ It installs the program under:
 
 These directories are commonly available without manually changing `PATH`.
 
-Universal Search uses `xdg-open` to open links. If it is missing, install `xdg-utils using your distribution's package manager.
+Universal Search uses `xdg-open` to open links. If it is missing, install `xdg-utils` using your distribution's package manager.
 
 ## Feedback and Contributions
 
 Feedback, bug reports, and suggestions are welcome.
 
-- **Repository:** https://github.com/fokompo/universal-search
-- **Report a bug:** https://github.com/fokompo/universal-search/issues
+- **Repository:** [Universal Search on GitHub](https://github.com/fokompo/universal-search)
+- **Report a bug:** [GitHub Issues](https://github.com/fokompo/universal-search/issues)
 
 If you test Universal Search on Ubuntu or another Linux distribution, please share your experience and report any compatibility issues.
 
 ## License
 
-Universal Search is released under the MIT License. See [LICENSE](LICENSE).
+Universal Search is released under the MIT License. See [LICENSE](https://github.com/fokompo/universal-search/blob/main/LICENSE).

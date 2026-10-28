@@ -1,14 +1,15 @@
 # Universal Search
 
-**Universal Search** is an open-source Bash utility for searching multiple websites directly from the terminal. It provides a colorful interactive menu and a command-line mode.
+**Universal Search** is an open-source Bash utility that lets you search multiple websites directly from the Linux terminal. It provides an interactive menu and a command-line mode with short website aliases.
 
 ## Features
 
-- Colorful interactive search menu.
-- Command-line mode when arguments are provided.
+- Interactive search menu.
+- Command-line searching with short website aliases.
+- Private/incognito browser mode with `-p` or `--private`.
 - Command aliases: `s`, `S`, `search`, and `Search`.
-- Universal installer for Linux.
-- Debian package support.
+- Universal Linux installer.
+- Debian and Ubuntu package support.
 - Arch Linux package support via `PKGBUILD`.
 - Opens search results using `xdg-open`.
 
@@ -30,7 +31,7 @@ curl -fsSL https://raw.githubusercontent.com/fokompo/universal-search/main/insta
 bash install.sh
 ```
 
-Or clone the repository and run the installer locally:
+Alternatively, clone the repository and run the installer locally:
 
 ```bash
 git clone https://github.com/fokompo/universal-search.git
@@ -42,7 +43,7 @@ The installer uses the local `search` file if available; otherwise, it downloads
 
 ## Usage
 
-> **Version compatibility:** The examples below describe the current project syntax. Available commands and options may differ between releases or installation methods. Run `search --help` to check the options supported by your installed version. If a command does not work, please report your Linux distribution, installation method, package version, and the output of `search --help`.
+> **Version compatibility:** Available commands and options may differ between releases or installation methods. Run `s --help` or `search --help` to check the syntax supported by your installed version. If a command does not work, include your Linux distribution, installation method, package version, and help output when reporting the issue.
 
 ### Interactive Menu
 
@@ -57,20 +58,116 @@ Search
 
 ### Command-Line Mode
 
-When arguments are provided, they are passed to command-line mode.
+Search a specific website directly from the terminal.
 
-Example YouTube searches:
+**Syntax:**
 
 ```bash
-S yt text
-S yt -p text
+s [site] search terms
 ```
 
-Replace `text` with your search query. Check the help output for supported options and syntax.
+- `s` — runs Universal Search.
+- `site` — the shortcut for the website you want to search.
+- `search terms` — the words or phrase you want to find.
+
+### Supported Websites and Shortcuts
+
+Use these shortcuts instead of typing full website names.
+
+| Shortcut | Website / Service |
+|---|---|
+| `google` | Google |
+| `yt` | YouTube |
+| `wiki` | Wikipedia |
+| `gh` | GitHub |
+| `reddit` | Reddit |
+| `ddg` | DuckDuckGo |
+| `mdn` | MDN Web Docs |
+| `arch` | Arch Linux |
+| `maps` | Maps search |
+| `images` | Image search |
+| `bing` | Bing |
+| `brave` | Brave Search |
+| `npm` | npm |
+| `pypi` | Python Package Index |
+| `rust` | Rust documentation |
+
+The exact services and options available may depend on your installed version. Check the help output for the authoritative list.
+
+### Search Examples
+
+**Search YouTube:**
+
+```bash
+s yt linux tutorials
+```
+
+**Search GitHub:**
+
+```bash
+s gh bash scripts
+```
+
+**Search Wikipedia:**
+
+```bash
+s wiki Linux
+```
+
+**Search Google:**
+
+```bash
+s google best Linux distributions
+s best Linux distributions
+```
+
+Replace the example text with your own search query.
+
+### Private / Incognito Mode
+
+Use `-p` or `--private` to request that search results open in a private or incognito browser window.
+
+**Short option:**
+
+```bash
+s -p yt linux tutorials
+```
+
+**Long option:**
+
+```bash
+s --private google Linux commands
+s --private Linux commands
+s -p google Linux commands
+s -p Linux commands
+```
+
+More examples:
+
+```bash
+s -p gh bash scripts
+s --private wiki Linux
+```
+
+Private mode depends on your browser and system configuration. It does not make your internet activity completely anonymous.
+
+### Open a Direct URL
+
+You can also provide a URL directly:
+
+```bash
+s https://example.com
+```
 
 ### Help
 
-Display available commands, options, and supported websites:
+Display the available commands, options, and supported websites:
+
+```bash
+s --help
+```
+
+You can also use:
 
 ```bash
 search --help
@@ -86,7 +183,7 @@ If you have downloaded a `.deb` package, install it with:
 sudo apt install ./universal-search_VERSION_all.deb
 ```
 
-Replace `VERSION` with the actual version in the downloaded filename.
+Replace `VERSION` with the actual version in the package filename.
 
 Alternatively:
 
@@ -109,7 +206,7 @@ Then follow the package-building instructions in the repository.
 
 The repository includes a `PKGBUILD` for Arch Linux and compatible distributions.
 
-Follow the packaging instructions in the repository and check the dependencies listed in `PKGBUILD` before building the package.
+Follow the repository's packaging instructions and check the dependencies listed in `PKGBUILD` before building the package.
 
 ## Uninstall
 
@@ -125,7 +222,7 @@ If you installed the Debian package:
 sudo apt remove universal-search
 ```
 
-For other installation methods, use the package manager or removal instructions appropriate to your installation.
+For other installation methods, use the package manager or the removal instructions appropriate to your installation.
 
 ## Linux Compatibility
 
@@ -142,13 +239,21 @@ Universal Search uses `xdg-open` to open links. If it is missing, install `xdg-u
 
 ## Feedback and Contributions
 
-Feedback, bug reports, and suggestions are welcome.
+Feedback, bug reports, and contributions are welcome.
 
-- **Repository:** [Universal Search on GitHub](https://github.com/fokompo/universal-search)
+- **Repository:** [Universal Search](https://github.com/fokompo/universal-search)
 - **Report a bug:** [GitHub Issues](https://github.com/fokompo/universal-search/issues)
 
-If you test Universal Search on Ubuntu or another Linux distribution, please share your experience and report any compatibility issues.
+When reporting a problem, please include:
+
+- Your Linux distribution.
+- Your installation method (installer, Debian package, or Arch package).
+- Your installed package version, if applicable.
+- The command you ran and the resulting output.
+- The output of `s --help`.
+
+Testing on Ubuntu and other Linux distributions is especially useful for identifying compatibility issues.
 
 ## License
 
-Universal Search is released under the MIT License. See [LICENSE](https://github.com/fokompo/universal-search/blob/main/LICENSE).
+Universal Search is released under the MIT License. See the [LICENSE](https://github.com/fokompo/universal-search/blob/main/LICENSE) file.

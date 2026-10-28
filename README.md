@@ -1,6 +1,6 @@
 # Universal Search
 
-**Universal Search** is an open-source Bash utility for searching multiple websites directly from the terminal. It features a colorful interactive menu and a command-line mode.
+**Universal Search** is an open-source Bash utility for searching multiple websites directly from the terminal. It provides a colorful interactive menu and a command-line mode.
 
 ## Features
 
@@ -19,7 +19,7 @@
 - Bash
 - `curl` or `wget`
 - `sudo` or root privileges for system-wide installation
-- `xdg-utils` for opening links
+- `xdg-utils` to open links in a browser
 
 ### Install
 
@@ -57,19 +57,14 @@ Search
 
 When arguments are provided, they are passed to command-line mode.
 
-For example, to search YouTube:
+Example YouTube searches:
 
 ```bash
 S yt text
-```
-
-To use the `-p` option:
-
-```bash
 S yt -p text
 ```
 
-Replace `text` with your search query. The exact behavior of options depends on the command syntax supported by your installed version.
+Replace `text` with your search query. Check the help output for supported options and syntax.
 
 ### Help
 
@@ -89,17 +84,17 @@ If you have downloaded a `.deb` package, install it with:
 sudo apt install ./universal-search_VERSION_all.deb
 ```
 
+Replace `VERSION` with the actual version in the downloaded filename.
+
 Alternatively:
 
 ```bash
 sudo dpkg -i ./universal-search_VERSION_all.deb
 ```
 
-Replace `VERSION` with the actual version in the downloaded filename.
-
 ### Build the Debian Package
 
-On Debian or Ubuntu, install the packaging tools:
+Install the packaging tools:
 
 ```bash
 sudo apt update
@@ -112,7 +107,7 @@ Then follow the package-building instructions in the repository.
 
 The repository includes a `PKGBUILD` for Arch Linux and compatible distributions.
 
-To build and install the package, follow the Arch packaging instructions and review the dependencies listed in `PKGBUILD`.
+Follow the packaging instructions in the repository and check the dependencies listed in `PKGBUILD` before building the package.
 
 ## Uninstall
 
@@ -128,28 +123,30 @@ If you installed the Debian package:
 sudo apt remove universal-search
 ```
 
-For other installation methods, use the package manager or removal instructions corresponding to your installation.
+For other installation methods, use the package manager or removal instructions appropriate to your installation.
 
 ## Linux Compatibility
 
-The universal installer does not require `apt`, `pacman`, or `dnf` to be present just to install files. It installs the program under:
+The universal installer does not require `apt`, `pacman`, or `dnf` just to install the program files.
+
+It installs the program under:
 
 - `/usr/local/lib/universal-search`
 - `/usr/local/bin`
 
 These directories are commonly available without manually changing `PATH`.
 
-Universal Search uses `xdg-open` to open links. If it is missing, install `xdg-utils` using your distribution's package manager.
+Universal Search uses `xdg-open` to open links. If it is missing, install `xdg-utils using your distribution's package manager.
 
 ## Feedback and Contributions
 
 Feedback, bug reports, and suggestions are welcome.
 
 - **Repository:** https://github.com/fokompo/universal-search
-- **Issues:** https://github.com/fokompo/universal-search/issues
+- **Report a bug:** https://github.com/fokompo/universal-search/issues
 
-If you test Universal Search on Ubuntu or another Linux distribution, please share your experience and report any compatibility problems.
+If you test Universal Search on Ubuntu or another Linux distribution, please share your experience and report any compatibility issues.
 
 ## License
 
-Universal Search is released under the MIT License. See [LICENSE](https://github.com/fokompo/universal-search/blob/main/LICENSE).
+Universal Search is released under the MIT License. See [LICENSE](LICENSE).

@@ -464,7 +464,7 @@ interactive_search() {
 
 show_help() {
     cat <<'HELP'
-Universal Search 1.0.6
+Universal Search 1.0.7
 Usage:
   search [site] query terms
   search --print-url [site] query terms

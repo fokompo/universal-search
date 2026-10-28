@@ -1,3 +1,10 @@
+universal-search (1.0.7-1) unstable; urgency=medium
+
+  * Add custom search sites from the interactive menu with the A key.
+  * Refresh the site list and category after adding a site.
+
+ -- fokompo <fokompo456@gmail.com>  Wed, 28 Oct 2026 21:45:00 +0000
+
 universal-search (1.0.6-1) unstable; urgency=medium
 
   * Add guided and argument-based CLI registration for custom search sites.

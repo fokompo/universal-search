@@ -352,7 +352,7 @@ class UniversalSearchUI:
         if self.filtering:
             controls = "Type filter  Enter done  Esc clear  Q quit"
         else:
-            controls = "↑↓ Move  ←→ Panel  Enter Search  / Filter  F Fav  P Private  Q Quit"
+            controls = "↑↓ Move  ←→ Panel  Enter Search  / Filter  F Fav  A Add site  Q Quit"
         self.clipped(self.screen, h - 2, 2, controls, w - 4, self.attr(5, True))
         self.clipped(self.screen, h - 1, 2, "G Category   P Private   B Browser   C Theme   Esc Clear / Back", w - 4, self.attr(3))
         # Refresh stdscr first; child panels must overlay its cleared body.
@@ -417,6 +417,113 @@ class UniversalSearchUI:
                 text = text[:-1]
             elif isinstance(key, str) and key.isprintable():
                 text += key
+
+    def prompt_add_site(self) -> None:
+        labels = (
+            "Site ID",
+            "Display name",
+            "Shortcut alias",
+            "Search URL prefix (query is appended)",
+            "Category (optional, defaults to Custom)",
+        )
+        values = ["", "", "", "", ""]
+        cursors = [0, 0, 0, 0, 0]
+        field = 0
+        error = ""
+        h, w = self.screen.getmaxyx()
+        box_w = min(w - 4, max(58, w // 2 + 12))
+        box_h = min(17, h)
+        y, x = max(0, (h - box_h) // 2), max(1, (w - box_w) // 2)
+        win = curses.newwin(box_h, box_w, y, x)
+        win.keypad(True)
+        try:
+            curses.curs_set(1)
+        except curses.error:
+            pass
+
+        try:
+            while True:
+                win.erase()
+                win.box()
+                self.clipped(win, 1, 2, "ADD A SEARCH SITE", box_w - 4, self.attr(1, True))
+                self.clipped(win, 2, 2, "Saved to your user config · existing sites are kept", box_w - 4, self.attr(3))
+                for index, label in enumerate(labels):
+                    label_y = 4 + index * 2
+                    input_y = label_y + 1
+                    active = index == field
+                    self.clipped(win, label_y, 2, label, box_w - 4, self.attr(1 if active else 3, active))
+                    shown = f"› {values[index]}"
+                    self.clipped(win, input_y, 2, shown.ljust(box_w - 4), box_w - 4,
+                                 self.attr(2 if active else 4, active))
+                    if active:
+                        cursor_x = min(box_w - 3, 4 + cursors[index])
+                        try:
+                            win.move(input_y, cursor_x)
+                        except curses.error:
+                            pass
+                self.clipped(win, box_h - 3, 2,
+                             error or "Tab/↑↓ next · Enter next/save · ←→ edit · Esc cancel",
+                             box_w - 4, self.attr(6 if error else 3))
+                win.refresh()
+                key = win.get_wch()
+
+                if key == "\x1b":
+                    self.message = "Add site cancelled."
+                    return
+                if key in ("\t", curses.KEY_DOWN):
+                    field = (field + 1) % len(labels)
+                    error = ""
+                    continue
+                if key == curses.KEY_BTAB or key == curses.KEY_UP:
+                    field = (field - 1) % len(labels)
+                    error = ""
+                    continue
+                if key in ("\n", "\r", curses.KEY_ENTER):
+                    if field < len(labels) - 1:
+                        field += 1
+                        error = ""
+                        continue
+                    command = [self.cli_path, "--add-site", *values]
+                    try:
+                        result = subprocess.run(command, text=True, capture_output=True, timeout=10)
+                    except (OSError, subprocess.SubprocessError) as exc:
+                        error = str(exc)
+                        continue
+                    if result.returncode:
+                        error = result.stderr.strip() or "Could not add this site. Check the fields and try again."
+                        continue
+                    site_id = values[0].lower()
+                    self.sites = load_sites()
+                    self.groups = ["All sites", "Favorites"] + list(dict.fromkeys(site["group"] for site in self.sites))
+                    self.category = self.groups.index(values[4]) if values[4] in self.groups else 0
+                    visible = self.filtered_sites()
+                    self.site = next((index for index, site in enumerate(visible) if site["id"] == site_id), 0)
+                    self.message = result.stdout.strip() or f"Added {values[1]} to the menu."
+                    return
+
+                value = values[field]
+                cursor = cursors[field]
+                if key in (curses.KEY_BACKSPACE, "\x7f", "\b"):
+                    if cursor:
+                        values[field] = value[:cursor - 1] + value[cursor:]
+                        cursors[field] -= 1
+                elif key == curses.KEY_LEFT:
+                    cursors[field] = max(0, cursor - 1)
+                elif key == curses.KEY_RIGHT:
+                    cursors[field] = min(len(value), cursor + 1)
+                elif key == curses.KEY_HOME:
+                    cursors[field] = 0
+                elif key == curses.KEY_END:
+                    cursors[field] = len(value)
+                elif isinstance(key, str) and key.isprintable():
+                    values[field] = value[:cursor] + key + value[cursor:]
+                    cursors[field] += len(key)
+                error = ""
+        finally:
+            try:
+                curses.curs_set(0)
+            except curses.error:
+                pass
 
     def launch(self, query: str, sites: list[dict[str, str]]) -> None:
         if not sites:
@@ -529,6 +636,8 @@ class UniversalSearchUI:
                     self.palette = 1 - self.palette
                     self._init_colors()
                     self.message = "Theme changed."
+                elif key in ("a", "A"):
+                    self.prompt_add_site()
                 elif key == "/":
                     self.filtering = True
                     self.message = "Type a site name, then press Enter."

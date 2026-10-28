@@ -1,4 +1,4 @@
-# Universal Search 1.0.6
+# Universal Search 1.0.7
 
 A Bash web-search launcher with a Python `curses` app-style terminal interface, site groups, favorites and custom site support. Bash continues to handle command-line searches; Python `curses` draws the interactive three-panel menu without a third-party Python library.
 
@@ -19,7 +19,7 @@ The interactive menu uses the Python 3 `curses` module. Debian and Arch packages
 
 `--print-url` shows the exact URL without opening a browser. `--group` opens the query on every site in that group; `--favorites` does the same for starred sites. Available groups include Web, Developer, Knowledge, Media, Community and Maps, plus any groups named in the user site file.
 
-Run `s`, `S`, `search` or `Search` with no arguments in a terminal to open the interactive menu. The menu has category, destination and detail panels. Use **↑/↓** to move and **←/→** to choose the active panel. **Enter** opens the search prompt; **Esc** goes back or clears the active filter. Press **/** to enter filter mode and type a site name; **Enter** finishes filtering. Lowercase or uppercase **F** toggles the selected site's favorite status, **Space** selects multiple sites, **G** cycles categories, **B** changes the browser, **C** changes the accent theme, **P** toggles private mode, and **Q** exits. Typing letters in the menu does not activate the filter unless filter mode is on. The selected category and destination stay highlighted while you move between panels.
+Run `s`, `S`, `search` or `Search` with no arguments in a terminal to open the interactive menu. The menu has category, destination and detail panels. Use **↑/↓** to move and **←/→** to choose the active panel. **Enter** opens the search prompt; **Esc** goes back or clears the active filter. Press **/** to enter filter mode and type a site name; **Enter** finishes filtering. Lowercase or uppercase **F** toggles the selected site's favorite status, **A** opens a form to add a site, **Space** selects multiple sites, **G** cycles categories, **B** changes the browser, **C** changes the accent theme, **P** toggles private mode, and **Q** exits. Typing letters in the menu does not activate the filter unless filter mode is on. The selected category and destination stay highlighted while you move between panels.
 
 From this source folder, use `./s`, `./S`, `./search` or `./Search` to run this checkout directly, even if an older system installation is earlier in `PATH`.
 
@@ -63,16 +63,16 @@ sudo ./install.sh
 
 This installs the program under `/usr/local/lib/universal-search/` and command links under `/usr/local/bin/`. It installs shell completions and a sample config under `/usr/local/share/`. `sudo ./uninstall.sh` removes application files and leaves user settings and data untouched.
 
-Build a Debian package with `./build-deb.sh`, then install it with `sudo apt install ./dist/universal-search_1.0.6-1_all.deb`.
+Build a Debian package with `./build-deb.sh`, then install it with `sudo apt install ./dist/universal-search_1.0.7-1_all.deb`.
 
 Build an Arch package with:
 
 ```bash
-BUILDDIR="${TMPDIR:-/tmp}/universal-search-1.0.6-build" \
+BUILDDIR="${TMPDIR:-/tmp}/universal-search-1.0.7-build" \
   PKGDEST="$PWD/dist" makepkg -Ccf --nodeps --skipinteg --nosign
 ```
 
-Then install it with `sudo pacman -U dist/universal-search-1.0.6-1-any.pkg.tar.zst`.
+Then install it with `sudo pacman -U dist/universal-search-1.0.7-1-any.pkg.tar.zst`.
 
 ## Tests
 

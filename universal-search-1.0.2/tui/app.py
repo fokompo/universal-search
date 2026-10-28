@@ -352,9 +352,9 @@ class UniversalSearchUI:
         if self.filtering:
             controls = "Type filter  Enter done  Esc clear  Q quit"
         else:
-            controls = "↑↓ Move  ←→ Panel  Enter Search  / Filter  F Fav  A Add site  Q Quit"
+            controls = "↑↓ Move  ←→ Panel  Enter Search  / Filter  F Fav  A Add  Q Quit"
         self.clipped(self.screen, h - 2, 2, controls, w - 4, self.attr(5, True))
-        self.clipped(self.screen, h - 1, 2, "G Category   P Private   B Browser   C Theme   Esc Clear / Back", w - 4, self.attr(3))
+        self.clipped(self.screen, h - 1, 2, "D Delete  G Category  P Private  B Browser  C Theme  Esc Back", w - 4, self.attr(3))
         # Refresh stdscr first; child panels must overlay its cleared body.
         self.screen.noutrefresh()
         for win in (side, middle, detail):
@@ -525,6 +525,51 @@ class UniversalSearchUI:
             except curses.error:
                 pass
 
+    def delete_site(self, site: dict[str, str] | None) -> None:
+        if not site:
+            self.message = "Choose a site to remove."
+            return
+        if site["id"] in {row[0] for row in BUILTIN_SITES}:
+            self.message = "Built-in sites cannot be removed."
+            return
+
+        h, w = self.screen.getmaxyx()
+        box_w, box_h = min(w - 4, max(52, w // 2)), 7
+        y, x = max(1, (h - box_h) // 2), max(1, (w - box_w) // 2)
+        win = curses.newwin(box_h, box_w, y, x)
+        win.keypad(True)
+        win.erase()
+        win.box()
+        self.clipped(win, 1, 2, "REMOVE CUSTOM SITE", box_w - 4, self.attr(6, True))
+        self.clipped(win, 2, 2, f"Delete {site['label']} [{site['alias']}]?", box_w - 4, self.attr(4))
+        self.clipped(win, 4, 2, "Y Delete    N / Esc Cancel", box_w - 4, self.attr(3, True))
+        win.refresh()
+        key = win.get_wch()
+        if key not in ("y", "Y"):
+            self.message = "Site removal cancelled."
+            return
+
+        try:
+            result = subprocess.run([self.cli_path, "--remove-site", site["id"]],
+                                    text=True, capture_output=True, timeout=10)
+        except (OSError, subprocess.SubprocessError) as exc:
+            self.message = str(exc)
+            return
+        if result.returncode:
+            self.message = result.stderr.strip() or "Could not remove this site."
+            return
+
+        previous_group = self.groups[self.category]
+        self.favorites.discard(site["id"])
+        self.favorites.discard(site["alias"])
+        self.picked.discard(site["id"])
+        self.sites = load_sites()
+        self.groups = ["All sites", "Favorites"] + list(dict.fromkeys(item["group"] for item in self.sites))
+        self.category = self.groups.index(previous_group) if previous_group in self.groups else 0
+        visible = self.filtered_sites()
+        self.site = min(self.site, max(0, len(visible) - 1))
+        self.message = result.stdout.strip() or f"Removed {site['label']} from the menu."
+
     def launch(self, query: str, sites: list[dict[str, str]]) -> None:
         if not sites:
             self.message = "Choose at least one destination first."
@@ -638,6 +683,8 @@ class UniversalSearchUI:
                     self.message = "Theme changed."
                 elif key in ("a", "A"):
                     self.prompt_add_site()
+                elif key in ("d", "D"):
+                    self.delete_site(sites[self.site] if sites else None)
                 elif key == "/":
                     self.filtering = True
                     self.message = "Type a site name, then press Enter."

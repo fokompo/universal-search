@@ -23,6 +23,17 @@ fi
 if "$ROOT/search" --add-site bad 'Bad' bad 'javascript:alert(1)' >/dev/null 2>&1; then
     fail 'non-http site prefix should fail'
 fi
+printf 'ts\n' > "$XDG_CONFIG_HOME/universal-search/favorites"
+"$ROOT/search" --remove-site ts >/dev/null
+if grep -q '^site|test-search|' "$XDG_CONFIG_HOME/universal-search/sites.conf"; then
+    fail 'removed custom site remains in config'
+fi
+if grep -qx 'ts' "$XDG_CONFIG_HOME/universal-search/favorites"; then
+    fail 'removed site remains in favorites'
+fi
+if "$ROOT/search" --remove-site github >/dev/null 2>&1; then
+    fail 'built-in site should not be removable'
+fi
 
 cat > "$XDG_CONFIG_HOME/universal-search/sites.conf" <<'CONFIG'
 # kind|id|label|alias|url-prefix|group
@@ -33,6 +44,13 @@ assert_eq "$("$ROOT/search" --print-url ex 'hello world')" \
     'https://example.org/find?q=hello%20world' 'custom site and alias'
 assert_eq "$("$ROOT/search" --print-url old legacy)" \
     'https://legacy.example/?q=legacy' 'legacy site format'
+"$ROOT/search" --remove-site old >/dev/null
+if grep -q '^legacy|' "$XDG_CONFIG_HOME/universal-search/sites.conf"; then
+    fail 'removed legacy-format site remains in config'
+fi
+if ! grep -q '^site|example|' "$XDG_CONFIG_HOME/universal-search/sites.conf"; then
+    fail 'removing legacy site deleted an unrelated custom site'
+fi
 assert_eq "$("$ROOT/search" --print-url --group Development hello)" \
     'https://example.org/find?q=hello' 'custom group'
 group_urls="$("$ROOT/search" --print-url --group Developer hello)"

@@ -1,5 +1,5 @@
 pkgname=universal-search
-pkgver=1.0.7
+pkgver=1.0.8
 pkgrel=1
 pkgdesc="Search the web from an interactive terminal menu or CLI"
 url='https://github.com/fokompo/universal-search'

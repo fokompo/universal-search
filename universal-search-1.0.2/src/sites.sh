@@ -21,6 +21,7 @@ site_urls=(
     'https://pypi.org/search/?q='
     'https://doc.rust-lang.org/std/?search='
 )
+builtin_site_count=${#sites[@]}
 
 # Optional user entries: site|id|label|alias|URL-prefix|group
 if [[ -r "$CONFIG_FILE" ]]; then
@@ -128,6 +129,62 @@ add_custom_site_interactive() {
     read -r -p 'Search URL prefix (query is appended): ' prefix || return 2
     read -r -p 'Group [Custom]: ' group || return 2
     add_custom_site "$id" "$label" "$alias" "$prefix" "${group:-Custom}"
+}
+
+remove_custom_site() {
+    local needle="${1,,}" index site_id site_alias line kind id label alias prefix group
+    local row_id row_alias removed=0 tmp favorites_tmp favorite
+    [[ -n "$needle" ]] || { printf 'Usage: search --remove-site ID_OR_ALIAS\n' >&2; return 2; }
+    index="$(site_index "$needle")" || { printf 'Unknown site: %s\n' "$1" >&2; return 2; }
+    if (( index < builtin_site_count )); then
+        printf 'Built-in sites cannot be removed: %s\n' "${labels[index]}" >&2
+        return 2
+    fi
+    site_id="${sites[index]}"
+    site_alias="${aliases[index]}"
+    [[ -f "$CONFIG_FILE" ]] || { printf 'Site config not found: %s\n' "$CONFIG_FILE" >&2; return 1; }
+
+    tmp="$(mktemp "$CONFIG_DIR/sites.XXXXXX")" || return 1
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        if [[ -z "$line" || "$line" == \#* ]]; then
+            printf '%s\n' "$line" >> "$tmp"
+            continue
+        fi
+        IFS='|' read -r kind id label alias prefix group <<< "$line"
+        if [[ "$kind" == site ]]; then
+            row_id="${id,,}"
+            row_alias="${alias,,}"
+        elif [[ -n "$kind" && -n "$id" && -n "$label" && -n "$alias" ]]; then
+            row_id="${kind,,}"
+            row_alias="${label,,}"
+        else
+            printf '%s\n' "$line" >> "$tmp"
+            continue
+        fi
+        if [[ "$row_id" == "$site_id" || "$row_alias" == "$site_alias" ]]; then
+            removed=$((removed + 1))
+        else
+            printf '%s\n' "$line" >> "$tmp"
+        fi
+    done < "$CONFIG_FILE"
+
+    if (( removed == 0 )); then
+        rm -f -- "$tmp"
+        printf 'Could not find a config entry for %s.\n' "$site_id" >&2
+        return 1
+    fi
+    chmod --reference="$CONFIG_FILE" "$tmp" 2>/dev/null || true
+    mv -- "$tmp" "$CONFIG_FILE" || { rm -f -- "$tmp"; return 1; }
+
+    if [[ -f "$FAVORITES_FILE" ]]; then
+        favorites_tmp="$(mktemp "$CONFIG_DIR/favorites.XXXXXX")" || return 1
+        while IFS= read -r favorite || [[ -n "$favorite" ]]; do
+            [[ "${favorite,,}" == "$site_id" || "${favorite,,}" == "$site_alias" ]] || printf '%s\n' "$favorite" >> "$favorites_tmp"
+        done < "$FAVORITES_FILE"
+        chmod --reference="$FAVORITES_FILE" "$favorites_tmp" 2>/dev/null || true
+        mv -- "$favorites_tmp" "$FAVORITES_FILE" || { rm -f -- "$favorites_tmp"; return 1; }
+    fi
+    printf 'Removed %s (%s) from %s\n' "${labels[index]}" "$site_alias" "$CONFIG_FILE"
 }
 
 build_group_names() {

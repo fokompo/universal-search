@@ -25,6 +25,7 @@ _universal_search() {
         '--browser[Select browser]:browser:(firefox chromium brave-browser google-chrome vivaldi)' \
         '--group[Search all sites in a group]:group:->group' \
         '--add-site[Add a custom search site]' \
+        '--remove-site[Remove a custom search site]:site:->site' \
         '*:site or query:->site'
     case "$state" in
         group) compadd -a groups ;;

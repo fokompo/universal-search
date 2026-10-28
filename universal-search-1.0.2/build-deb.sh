@@ -29,7 +29,7 @@ ln -s search "$STAGE/usr/bin/S"
 ln -s search "$STAGE/usr/bin/Search"
 cat > "$STAGE/DEBIAN/control" <<'CONTROL'
 Package: universal-search
-Version: 1.0.5-1
+Version: 1.0.6-1
 Section: utils
 Priority: optional
 Architecture: all
@@ -41,4 +41,4 @@ Description: Universal terminal search
 CONTROL
 
 dpkg-deb --root-owner-group --build "$STAGE" \
-    "$DIST/universal-search_1.0.5-1_all.deb"
+    "$DIST/universal-search_1.0.6-1_all.deb"

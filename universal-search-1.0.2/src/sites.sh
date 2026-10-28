@@ -94,6 +94,42 @@ site_index() {
     return 1
 }
 
+add_custom_site() {
+    local id="${1:-}" label="${2:-}" alias="${3:-}" prefix="${4:-}" group="${5:-Custom}"
+    local normalized_id="${id,,}" normalized_alias="${alias,,}" current
+
+    [[ "$id" =~ ^[a-zA-Z0-9_-]+$ ]] || { printf 'Site ID must contain only letters, numbers, _ or -.\n' >&2; return 2; }
+    [[ -n "$label" && "$label" != *'|'* && "$label" != *$'\n'* ]] || { printf 'Site name must be non-empty and cannot contain | or a newline.\n' >&2; return 2; }
+    [[ "$alias" =~ ^[a-zA-Z0-9_-]+$ ]] || { printf 'Alias must contain only letters, numbers, _ or -.\n' >&2; return 2; }
+    [[ "$prefix" =~ ^https?://[^[:space:]\|]*$ ]] || { printf 'URL prefix must start with http:// or https:// and contain no spaces or |.\n' >&2; return 2; }
+    [[ -n "$group" && "$group" != *'|'* && "$group" != *$'\n'* ]] || { printf 'Group must be non-empty and cannot contain | or a newline.\n' >&2; return 2; }
+
+    for current in "${sites[@]}" "${aliases[@]}"; do
+        if [[ "${current,,}" == "$normalized_id" || "${current,,}" == "$normalized_alias" ]]; then
+            printf 'Site ID or alias already exists: %s\n' "$current" >&2
+            return 2
+        fi
+    done
+
+    mkdir -p -- "$CONFIG_DIR" || { printf 'Could not create config directory: %s\n' "$CONFIG_DIR" >&2; return 1; }
+    printf 'site|%s|%s|%s|%s|%s\n' "$normalized_id" "$label" "$normalized_alias" "$prefix" "$group" >> "$CONFIG_FILE" || {
+        printf 'Could not update site config: %s\n' "$CONFIG_FILE" >&2
+        return 1
+    }
+    printf 'Added %s (%s) to %s\n' "$label" "$normalized_alias" "$CONFIG_FILE"
+}
+
+add_custom_site_interactive() {
+    local id label alias prefix group
+    [[ -t 0 ]] || { printf 'Interactive site setup needs a terminal. Pass the site details as arguments.\n' >&2; return 2; }
+    read -r -p 'Site ID (for example: stackoverflow): ' id || return 2
+    read -r -p 'Display name: ' label || return 2
+    read -r -p 'Short alias (for example: so): ' alias || return 2
+    read -r -p 'Search URL prefix (query is appended): ' prefix || return 2
+    read -r -p 'Group [Custom]: ' group || return 2
+    add_custom_site "$id" "$label" "$alias" "$prefix" "${group:-Custom}"
+}
+
 build_group_names() {
     groups=(All Favorites)
     local group found existing

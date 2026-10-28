@@ -1,3 +1,10 @@
+universal-search (1.0.6-1) unstable; urgency=medium
+
+  * Add guided and argument-based CLI registration for custom search sites.
+  * Validate site fields and reject duplicate IDs and aliases.
+
+ -- fokompo <fokompo456@gmail.com>  Wed, 28 Oct 2026 21:30:00 +0000
+
 universal-search (1.0.5-1) unstable; urgency=medium
 
   * Add a Python curses interface with category, site and details panels.

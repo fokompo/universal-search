@@ -464,13 +464,14 @@ interactive_search() {
 
 show_help() {
     cat <<'HELP'
-Universal Search 1.0.5
+Universal Search 1.0.6
 Usage:
   search [site] query terms
   search --print-url [site] query terms
   search --group GROUP query terms
   search --favorites query terms
   search --browser NAME [site] query terms
+  search --add-site [ID NAME ALIAS URL_PREFIX [GROUP]]
   S                              Interactive menu
 
 Options:
@@ -479,6 +480,7 @@ Options:
   --group GROUP             Search all sites in a group
   --favorites               Search all favorite sites
   --browser NAME            Use a browser for this command
+  --add-site                Add a site; without arguments, start guided setup
   --no-color, --plain       Disable interface colors
   -h, --help                Show help
 
@@ -502,6 +504,18 @@ while (($#)); do
         --browser)
             (($# >= 2)) || { printf 'Missing browser name after --browser.\n' >&2; exit 2; }
             browser_choice="$2"; shift ;;
+        --add-site)
+            if (($# == 1)); then
+                add_custom_site_interactive
+                exit $?
+            fi
+            if (($# < 5 || $# > 6)); then
+                printf 'Usage: search --add-site ID NAME ALIAS URL_PREFIX [GROUP]\n' >&2
+                exit 2
+            fi
+            add_custom_site "$2" "$3" "$4" "$5" "${6:-Custom}"
+            exit $?
+            ;;
         -i|--interactive) interactive_requested=1 ;;
         --) shift; args+=("$@"); break ;;
         *) args+=("$1") ;;

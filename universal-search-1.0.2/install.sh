@@ -27,4 +27,4 @@ install -m 644 "$SOURCE_DIR/completions/search.bash" "$SHARE_DIR/bash-completion
 install -m 644 "$SOURCE_DIR/completions/_universal-search" "$SHARE_DIR/zsh/site-functions/_universal-search"
 install -m 644 "$SOURCE_DIR/config/sites.conf.example" "$SHARE_DIR/doc/universal-search/sites.conf.example"
 for name in search s S Search; do ln -sfn "$APP_DIR/search" "$BIN_DIR/$name"; done
-printf 'Universal Search 1.0.5 installed. Commands: search, s, S, Search\n'
+printf 'Universal Search 1.0.6 installed. Commands: search, s, S, Search\n'

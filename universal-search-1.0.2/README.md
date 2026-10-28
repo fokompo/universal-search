@@ -1,4 +1,4 @@
-# Universal Search 1.0.5
+# Universal Search 1.0.6
 
 A Bash web-search launcher with a Python `curses` app-style terminal interface, site groups, favorites and custom site support. Bash continues to handle command-line searches; Python `curses` draws the interactive three-panel menu without a third-party Python library.
 
@@ -14,6 +14,7 @@ The interactive menu uses the Python 3 `curses` module. Debian and Arch packages
 ./search --print-url --favorites 'terminal tools'
 ./search --browser firefox github 'bash arrays'
 ./search --no-color --help
+./search --add-site stackoverflow 'Stack Overflow' so 'https://stackoverflow.com/search?q=' Developer
 ```
 
 `--print-url` shows the exact URL without opening a browser. `--group` opens the query on every site in that group; `--favorites` does the same for starred sites. Available groups include Web, Developer, Knowledge, Media, Community and Maps, plus any groups named in the user site file.
@@ -40,6 +41,8 @@ For example, `site|stackoverflow|Stack Overflow|so|https://stackoverflow.com/sea
 
 The interactive menu starts with Google, GitHub and YouTube as favorites. Press **F** or **f** to change a favorite; changes are saved in the favorites file. The settings file supports `browser=firefox` and `color=auto|always|never`. The **B** and **C** menu keys save settings. `UNIVERSAL_SEARCH_BROWSER` can override the configured browser for a shell session.
 
+Add a custom site with `search --add-site ID NAME ALIAS URL_PREFIX [GROUP]`. The query is URL-encoded and appended to the URL prefix. Run `search --add-site` without arguments for guided prompts. The command adds one entry to `sites.conf` and keeps existing sites and settings intact.
+
 History remains at `${XDG_DATA_HOME:-$HOME/.local/share}/universal-search/history`. The results directory is `${XDG_DATA_HOME:-$HOME/.local/share}/universal-search/results/`; this application opens search pages in the browser and does not download pages into that directory.
 
 ## Browser and private mode
@@ -60,16 +63,16 @@ sudo ./install.sh
 
 This installs the program under `/usr/local/lib/universal-search/` and command links under `/usr/local/bin/`. It installs shell completions and a sample config under `/usr/local/share/`. `sudo ./uninstall.sh` removes application files and leaves user settings and data untouched.
 
-Build a Debian package with `./build-deb.sh`, then install it with `sudo apt install ./dist/universal-search_1.0.5-1_all.deb`.
+Build a Debian package with `./build-deb.sh`, then install it with `sudo apt install ./dist/universal-search_1.0.6-1_all.deb`.
 
 Build an Arch package with:
 
 ```bash
-BUILDDIR="${TMPDIR:-/tmp}/universal-search-1.0.5-build" \
+BUILDDIR="${TMPDIR:-/tmp}/universal-search-1.0.6-build" \
   PKGDEST="$PWD/dist" makepkg -Ccf --nodeps --skipinteg --nosign
 ```
 
-Then install it with `sudo pacman -U dist/universal-search-1.0.5-1-any.pkg.tar.zst`.
+Then install it with `sudo pacman -U dist/universal-search-1.0.6-1-any.pkg.tar.zst`.
 
 ## Tests
 

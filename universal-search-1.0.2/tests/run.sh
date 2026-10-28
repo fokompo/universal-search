@@ -14,6 +14,16 @@ assert_eq() { [[ "$1" == "$2" ]] || fail "$3 (got: $1; expected: $2)"; }
 assert_eq "$("$ROOT/search" --print-url github 'bash arrays & loops')" \
     'https://github.com/search?q=bash%20arrays%20%26%20loops' 'URL encoding'
 
+"$ROOT/search" --add-site test-search 'Test Search' ts 'https://test.example/search?q=' Testing >/dev/null
+assert_eq "$("$ROOT/search" --print-url ts 'one two')" \
+    'https://test.example/search?q=one%20two' 'CLI site registration'
+if "$ROOT/search" --add-site duplicate 'Duplicate' ts 'https://duplicate.example/?q=' >/dev/null 2>&1; then
+    fail 'duplicate site alias should fail'
+fi
+if "$ROOT/search" --add-site bad 'Bad' bad 'javascript:alert(1)' >/dev/null 2>&1; then
+    fail 'non-http site prefix should fail'
+fi
+
 cat > "$XDG_CONFIG_HOME/universal-search/sites.conf" <<'CONFIG'
 # kind|id|label|alias|url-prefix|group
 site|example|Example Search|ex|https://example.org/find?q=|Development

@@ -84,11 +84,11 @@ Use these shortcuts instead of typing full website names.
 | `ddg` | DuckDuckGo |
 | `mdn` | MDN Web Docs |
 | `arch` | Arch Linux |
-| `maps` | Maps search |
-| `images` | Image search |
-| `bing` | Bing |
+| `maps` | Google Maps |
+| `images` | Google Images |
+| `bing` | Bing Search |
 | `brave` | Brave Search |
-| `npm` | npm |
+| `npm` | npm Registry |
 | `pypi` | Python Package Index |
 | `rust` | Rust documentation |
 

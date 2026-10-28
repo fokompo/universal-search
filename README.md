@@ -83,7 +83,7 @@ Use these shortcuts instead of typing full website names.
 | `reddit` | Reddit |
 | `ddg` | DuckDuckGo |
 | `mdn` | MDN Web Docs |
-| `arch` | Arch Wikipedia |
+| `arch` | Arch Wiki |
 | `maps` | Google Maps |
 | `images` | Google Images |
 | `bing` | Bing Search |
